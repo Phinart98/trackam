@@ -13,8 +13,8 @@ const isActive = (to: string) => route.path === to
 </script>
 
 <template>
-  <nav class="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 safe-area-bottom">
-    <div class="flex items-end justify-around max-w-lg mx-auto px-2 py-1">
+  <nav class="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 safe-area-bottom">
+    <div class="flex items-end justify-around px-2 py-1">
       <template v-for="item in navItems" :key="item.to">
         <!-- Elevated Add button -->
         <NuxtLink

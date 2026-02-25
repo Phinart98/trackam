@@ -1,21 +1,34 @@
 <script setup lang="ts">
 const auth = useAuthStore()
+const tx = useTransactionStore()
 const router = useRouter()
 
-// Redirect to login if not authenticated
 onMounted(() => {
   if (!auth.isLoggedIn) {
     router.replace('/')
+    return
   }
+  // Seed data once on first authenticated mount regardless of which page loads first
+  tx.seed()
 })
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 flex flex-col">
-    <AppLayoutAppHeader />
-    <main class="flex-1 overflow-y-auto pb-24 max-w-lg mx-auto w-full">
-      <slot />
+  <div class="min-h-screen bg-slate-50">
+    <!-- Desktop sidebar -->
+    <LayoutSideNav />
+
+    <!-- Mobile header -->
+    <LayoutAppHeader />
+
+    <!-- Main content — offset by sidebar on desktop -->
+    <main class="lg:pl-60 pb-24 lg:pb-6 min-h-screen">
+      <div class="max-w-5xl mx-auto">
+        <slot />
+      </div>
     </main>
-    <AppLayoutBottomNav />
+
+    <!-- Mobile bottom nav -->
+    <LayoutBottomNav />
   </div>
 </template>
