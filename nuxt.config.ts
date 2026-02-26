@@ -3,7 +3,8 @@ export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
     '@nuxt/ui',
-    '@pinia/nuxt'
+    '@pinia/nuxt',
+    'pinia-plugin-persistedstate/nuxt'
   ],
 
   devtools: {
@@ -25,6 +26,15 @@ export default defineNuxtConfig({
   },
 
   ssr: false,
+
+  vite: {
+    resolve: {
+      dedupe: ['pinia', 'vue', '@vue/runtime-core']
+    },
+    optimizeDeps: {
+      include: ['chart.js', 'vue-chartjs', 'pinia-plugin-persistedstate']
+    }
+  },
 
   compatibilityDate: '2025-01-15',
 

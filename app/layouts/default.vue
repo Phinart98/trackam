@@ -3,13 +3,15 @@ const auth = useAuthStore()
 const tx = useTransactionStore()
 const router = useRouter()
 
+// Seed synchronously so data is available on the first render
+if (auth.isLoggedIn) {
+  tx.seed()
+}
+
 onMounted(() => {
   if (!auth.isLoggedIn) {
     router.replace('/')
-    return
   }
-  // Seed data once on first authenticated mount regardless of which page loads first
-  tx.seed()
 })
 </script>
 

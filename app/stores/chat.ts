@@ -9,11 +9,15 @@ export const useChatStore = defineStore('chat', {
   actions: {
     addMessage(role: 'user' | 'assistant', content: string) {
       this.messages.push({
-        id: Date.now().toString(),
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         role,
         content,
         timestamp: new Date().toISOString(),
       })
+    },
+    updateMessageContent(id: string, content: string) {
+      const msg = this.messages.find(m => m.id === id)
+      if (msg) msg.content = content
     },
     clearChat() {
       this.messages = []

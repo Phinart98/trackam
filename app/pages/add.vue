@@ -140,7 +140,7 @@ const confidenceBg = (score: number) =>
     <!-- Tab Selector -->
     <div class="flex gap-2 mb-5 p-1 bg-slate-100 rounded-xl">
       <button
-        v-for="tab in [{ id: 'text', icon: 'i-lucide-message-square-text', label: 'Text' }, { id: 'scan', icon: 'i-lucide-scan-line', label: 'Scan' }, { id: 'manual', icon: 'i-lucide-pencil', label: 'Manual' }]"
+        v-for="tab in [{ id: 'text', icon: 'i-lucide-message-square-text', label: 'Text' }, { id: 'scan', icon: 'i-lucide-camera', label: 'Photo' }, { id: 'manual', icon: 'i-lucide-pencil', label: 'Manual' }]"
         :key="tab.id"
         class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-all"
         :class="activeTab === tab.id ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
@@ -161,7 +161,7 @@ const confidenceBg = (score: number) =>
           v-model="textInput"
           rows="4"
           placeholder="e.g. Bought 3 bags of rice 150 cedis each at Makola Market"
-          class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 resize-none"
+          class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 resize-none"
         />
       </div>
 
@@ -239,7 +239,7 @@ const confidenceBg = (score: number) =>
       >
         <div v-if="!previewUrl">
           <UIcon name="i-lucide-camera" class="text-slate-400 text-4xl mb-3" />
-          <p class="text-sm font-semibold text-slate-700 mb-1">Tap to upload receipt or MoMo screenshot</p>
+          <p class="text-sm font-semibold text-slate-700 mb-1">Tap to snap a receipt or MoMo screenshot</p>
           <p class="text-xs text-slate-400">Supports printed, handwritten, and mobile money screenshots</p>
         </div>
         <img v-else :src="previewUrl" alt="Receipt preview" class="mx-auto max-h-48 rounded-lg object-contain">
@@ -370,6 +370,7 @@ const confidenceBg = (score: number) =>
         <input
           v-model="manualDate"
           type="date"
+          :max="new Date().toISOString().slice(0, 10)"
           class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-800 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
         >
       </div>

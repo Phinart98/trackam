@@ -39,9 +39,11 @@ const testimonials = [
   { name: 'Abena Owusu', role: 'Freelance tailor, Kumasi', quote: 'Tracking MoMo payments used to be a headache. Not anymore.' },
 ]
 const currentTestimonial = ref(0)
+let intervalId: ReturnType<typeof setInterval>
 onMounted(() => {
-  setInterval(() => { currentTestimonial.value = (currentTestimonial.value + 1) % testimonials.length }, 4000)
+  intervalId = setInterval(() => { currentTestimonial.value = (currentTestimonial.value + 1) % testimonials.length }, 4000)
 })
+onUnmounted(() => clearInterval(intervalId))
 </script>
 
 <template>

@@ -28,7 +28,7 @@ const isActive = (to: string) => route.path === to
           >
             <UIcon name="i-lucide-plus" class="text-white text-2xl" />
           </span>
-          <span class="text-[10px] mt-1 font-medium" :class="isActive(item.to) ? 'text-emerald-600' : 'text-slate-400'">
+          <span class="text-[11px] mt-1 font-medium" :class="isActive(item.to) ? 'text-emerald-600' : 'text-slate-400'">
             {{ item.label }}
           </span>
         </NuxtLink>
@@ -41,7 +41,7 @@ const isActive = (to: string) => route.path === to
           :class="isActive(item.to) ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'"
         >
           <UIcon :name="item.icon" class="text-xl mb-0.5" />
-          <span class="text-[10px] font-medium">{{ item.label }}</span>
+          <span class="text-[11px] font-medium">{{ item.label }}</span>
         </NuxtLink>
       </template>
     </div>

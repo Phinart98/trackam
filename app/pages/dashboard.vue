@@ -7,6 +7,33 @@ const tx = useTransactionStore()
 
 const ranges = ['1W', '1M', '3M', '6M'] as const
 
+// Animated counter — counts from 0 to target over ~1.2s
+const displayBalance = ref(0)
+const displayIncome = ref(0)
+const displayExpenses = ref(0)
+let animatedOnce = false
+
+function animateCounter(target: number, setter: (v: number) => void, duration = 1200) {
+  const start = performance.now()
+  function tick(now: number) {
+    const elapsed = now - start
+    const progress = Math.min(elapsed / duration, 1)
+    const eased = 1 - (1 - progress) ** 3 // ease-out cubic
+    setter(Math.round(target * eased))
+    if (progress < 1) requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+}
+
+onMounted(() => {
+  if (!animatedOnce) {
+    animatedOnce = true
+    animateCounter(tx.balance, v => { displayBalance.value = v })
+    animateCounter(tx.totalIncome, v => { displayIncome.value = v })
+    animateCounter(tx.totalExpenses, v => { displayExpenses.value = v })
+  }
+})
+
 const forecast = computed(() => {
   const budget = auth.profile?.monthlyBudget ?? 0
   return calculateBurnRate(tx.transactions, budget)
@@ -52,6 +79,33 @@ const healthRingColor = computed(() => {
   if (s >= 40) return 'stroke-amber-500'
   return 'stroke-red-500'
 })
+
+// Plain-language narratives for non-data-literate users
+const activityNarrative = computed(() => {
+  const d = tx.chartData
+  const totalInc = d.income.reduce((s, v) => s + v, 0)
+  const totalExp = d.expenses.reduce((s, v) => s + v, 0)
+  const rangeLabel = tx.chartRange === '1W' ? 'this week' : tx.chartRange === '1M' ? 'this month' : tx.chartRange === '3M' ? 'these 3 months' : 'these 6 months'
+  if (totalInc === 0 && totalExp === 0) return 'No activity yet for this period.'
+  if (totalInc > totalExp) return `${rangeLabel.charAt(0).toUpperCase() + rangeLabel.slice(1)}, you earned more than you spent — that's good!`
+  if (totalExp > totalInc) return `${rangeLabel.charAt(0).toUpperCase() + rangeLabel.slice(1)}, you spent more than you earned — be careful.`
+  return `${rangeLabel.charAt(0).toUpperCase() + rangeLabel.slice(1)}, your income and spending are about equal.`
+})
+
+const categoryNarrative = computed(() => {
+  const cats = tx.categoryBreakdown
+  if (cats.length === 0) return ''
+  const top = cats[0]!
+  const totalSpend = cats.reduce((s, c) => s + c.amount, 0)
+  return `${top.name} is where most of your money goes — ${formatCurrency(top.amount, auth.currency)} out of ${formatCurrency(totalSpend, auth.currency)} total.`
+})
+
+const healthExplanation = computed(() => {
+  const s = healthScore.value.score
+  if (s >= 70) return 'You are earning well, spending carefully, and tracking your money. Keep going!'
+  if (s >= 40) return 'You are doing okay, but there is room to spend less or earn more.'
+  return 'Your spending is higher than your income. Try to cut costs or find more income this week.'
+})
 </script>
 
 <template>
@@ -80,7 +134,7 @@ const healthRingColor = computed(() => {
           <p class="text-emerald-100 text-xs font-semibold uppercase tracking-widest mb-2">Net Balance</p>
           <ClientOnly>
             <p class="text-4xl lg:text-5xl font-bold tracking-tight">
-              {{ formatCurrency(tx.balance, auth.currency) }}
+              {{ formatCurrency(displayBalance, auth.currency) }}
             </p>
           </ClientOnly>
           <!-- trend badge -->
@@ -100,7 +154,7 @@ const healthRingColor = computed(() => {
               <span class="text-emerald-200 text-xs font-medium">Income</span>
             </div>
             <ClientOnly>
-              <p class="text-white font-bold text-lg">{{ formatCurrency(tx.totalIncome, auth.currency) }}</p>
+              <p class="text-white font-bold text-lg">{{ formatCurrency(displayIncome, auth.currency) }}</p>
             </ClientOnly>
           </div>
           <div class="w-px bg-white/20 hidden lg:block" />
@@ -110,7 +164,7 @@ const healthRingColor = computed(() => {
               <span class="text-emerald-200 text-xs font-medium">Expenses</span>
             </div>
             <ClientOnly>
-              <p class="text-white font-bold text-lg">{{ formatCurrency(tx.totalExpenses, auth.currency) }}</p>
+              <p class="text-white font-bold text-lg">{{ formatCurrency(displayExpenses, auth.currency) }}</p>
             </ClientOnly>
           </div>
         </div>
@@ -127,9 +181,9 @@ const healthRingColor = computed(() => {
       </NuxtLink>
       <NuxtLink to="/add?tab=scan" class="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:shadow-md active:scale-[0.98] transition-all">
         <span class="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
-          <UIcon name="i-lucide-scan-line" class="text-amber-600 text-lg" />
+          <UIcon name="i-lucide-camera" class="text-amber-600 text-lg" />
         </span>
-        <span class="text-sm font-semibold text-slate-800">Scan Receipt</span>
+        <span class="text-sm font-semibold text-slate-800">Snap Receipt</span>
       </NuxtLink>
     </div>
 
@@ -152,7 +206,7 @@ const healthRingColor = computed(() => {
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
             <UIcon name="i-lucide-bar-chart-3" class="text-emerald-500 text-lg" />
-            <h3 class="text-sm font-bold text-slate-800">Activity</h3>
+            <h3 class="text-sm font-bold text-slate-800">Your Money Flow</h3>
           </div>
           <!-- Range selector -->
           <div class="flex gap-1 bg-slate-100 rounded-lg p-0.5">
@@ -167,7 +221,7 @@ const healthRingColor = computed(() => {
             </button>
           </div>
         </div>
-        <div class="flex gap-4 mb-3">
+        <div class="flex gap-4 mb-2">
           <div class="flex items-center gap-1.5">
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-500" />
             <span class="text-xs text-slate-500">Income</span>
@@ -177,6 +231,7 @@ const healthRingColor = computed(() => {
             <span class="text-xs text-slate-500">Expenses</span>
           </div>
         </div>
+        <p class="text-[13px] text-slate-500 leading-relaxed mb-3">{{ activityNarrative }}</p>
         <ChartsWeeklyTrendChart :data="tx.chartData" />
       </div>
 
@@ -184,20 +239,20 @@ const healthRingColor = computed(() => {
       <div class="bg-white rounded-xl border border-slate-200 p-4">
         <div class="flex items-center gap-2 mb-4">
           <UIcon name="i-lucide-calendar-check" class="text-amber-500 text-lg" />
-          <h3 class="text-sm font-bold text-slate-800">Month Forecast</h3>
+          <h3 class="text-sm font-bold text-slate-800">Rest of This Month</h3>
           <span class="ml-auto text-xs text-slate-400">{{ forecast.daysRemaining }}d left</span>
         </div>
 
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div class="bg-emerald-50 rounded-xl p-3">
-            <p class="text-xs text-emerald-600 font-medium mb-1">Est. End Balance</p>
+            <p class="text-xs text-emerald-600 font-medium mb-1">Money Left End of Month</p>
             <ClientOnly>
               <p class="text-lg font-bold text-emerald-700">{{ formatCurrency(Math.abs(forecast.projectedEndBalance), auth.currency) }}</p>
             </ClientOnly>
             <p class="text-[10px] text-emerald-500 mt-0.5">{{ forecast.projectedEndBalance >= 0 ? 'projected profit' : 'projected deficit' }}</p>
           </div>
           <div class="bg-amber-50 rounded-xl p-3">
-            <p class="text-xs text-amber-600 font-medium mb-1">Daily Spend Rate</p>
+            <p class="text-xs text-amber-600 font-medium mb-1">You Spend Per Day</p>
             <ClientOnly>
               <p class="text-lg font-bold text-amber-700">{{ formatCurrency(forecast.dailyAverage, auth.currency) }}</p>
             </ClientOnly>
@@ -208,7 +263,7 @@ const healthRingColor = computed(() => {
         <!-- Budget progress bar -->
         <div class="mb-3">
           <div class="flex justify-between text-xs text-slate-500 mb-1.5">
-            <span>Budget used</span>
+            <span>Budget spent so far</span>
             <span>{{ Math.min(forecast.burnPercent, 999) }}%</span>
           </div>
           <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -243,6 +298,7 @@ const healthRingColor = computed(() => {
           <UIcon name="i-lucide-pie-chart" class="text-violet-500 text-lg" />
           <h3 class="text-sm font-bold text-slate-800">Where Your Money Goes</h3>
         </div>
+        <p v-if="categoryNarrative" class="text-[13px] text-slate-500 leading-relaxed mb-3">{{ categoryNarrative }}</p>
         <div class="flex gap-4 items-center">
           <div class="w-32 shrink-0">
             <ChartsCategoryDoughnut :data="tx.categoryBreakdown" />
@@ -255,7 +311,7 @@ const healthRingColor = computed(() => {
             >
               <span class="w-2 h-2 rounded-full shrink-0" :style="{ backgroundColor: cat.dotColor }" />
               <span class="text-xs text-slate-600 truncate flex-1">{{ cat.name }}</span>
-              <span class="text-xs font-semibold text-slate-800 shrink-0">{{ cat.percentage }}%</span>
+              <span class="text-xs font-semibold text-slate-800 shrink-0">{{ formatCurrency(cat.amount, auth.currency) }}</span>
             </div>
           </div>
         </div>
@@ -300,7 +356,7 @@ const healthRingColor = computed(() => {
       <div class="bg-white rounded-xl border border-slate-200 p-4">
         <div class="flex items-center gap-2 mb-4">
           <UIcon name="i-lucide-heart" class="text-rose-500 text-lg" />
-          <h3 class="text-sm font-bold text-slate-800">Financial Health</h3>
+          <h3 class="text-sm font-bold text-slate-800">How Are You Doing?</h3>
         </div>
         <div class="flex items-center gap-5">
           <!-- SVG circle gauge -->
@@ -322,7 +378,7 @@ const healthRingColor = computed(() => {
           </div>
           <div>
             <p class="text-sm font-bold" :class="healthScore.color">{{ healthScore.label }}</p>
-            <p class="text-xs text-slate-400 mt-1 leading-relaxed">Based on income ratio, spending trend, budget use &amp; tracking consistency</p>
+            <p class="text-xs text-slate-500 mt-1 leading-relaxed">{{ healthExplanation }}</p>
           </div>
         </div>
       </div>
@@ -331,59 +387,56 @@ const healthRingColor = computed(() => {
       <div class="bg-white rounded-xl border border-slate-200 p-4">
         <div class="flex items-center gap-2 mb-4">
           <UIcon name="i-lucide-activity" class="text-blue-500 text-lg" />
-          <h3 class="text-sm font-bold text-slate-800">Weekly Pulse</h3>
+          <h3 class="text-sm font-bold text-slate-800">This Week vs Last Week</h3>
         </div>
         <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-slate-500">Income</span>
-            <div class="flex items-center gap-1.5">
-              <UIcon
-                :name="pulse.incomeChange >= 0 ? 'i-lucide-trending-up' : 'i-lucide-trending-down'"
-                class="text-sm"
-                :class="pulse.incomeChange >= 0 ? 'text-emerald-500' : 'text-red-500'"
-              />
-              <span class="text-sm font-bold" :class="pulse.incomeChange >= 0 ? 'text-emerald-600' : 'text-red-500'">
-                {{ pulse.incomeChange >= 0 ? '+' : '' }}{{ pulse.incomeChange }}%
+          <!-- Income comparison -->
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-medium text-slate-500">Money Earned</span>
+              <span class="text-xs font-bold px-2 py-0.5 rounded-full"
+                :class="pulse.incomeChange >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'">
+                {{ pulse.incomeChange >= 0 ? '↑ Up' : '↓ Down' }}
               </span>
+            </div>
+            <div class="flex items-center gap-1.5 text-xs text-slate-600">
+              <ClientOnly>
+                <span class="text-slate-400">Last wk:</span>
+                <strong>{{ formatCurrency(pulse.lastWeekIncome, auth.currency) }}</strong>
+                <UIcon name="i-lucide-arrow-right" class="text-slate-300 text-base" />
+                <span class="text-slate-400">This wk:</span>
+                <strong :class="pulse.incomeChange >= 0 ? 'text-emerald-600' : 'text-red-500'">{{ formatCurrency(pulse.thisWeekIncome, auth.currency) }}</strong>
+              </ClientOnly>
             </div>
           </div>
           <div class="h-px bg-slate-100" />
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-slate-500">Expenses</span>
-            <div class="flex items-center gap-1.5">
-              <UIcon
-                :name="pulse.expenseChange <= 0 ? 'i-lucide-trending-down' : 'i-lucide-trending-up'"
-                class="text-sm"
-                :class="pulse.expenseChange <= 0 ? 'text-emerald-500' : 'text-red-500'"
-              />
-              <span class="text-sm font-bold" :class="pulse.expenseChange <= 0 ? 'text-emerald-600' : 'text-red-500'">
-                {{ pulse.expenseChange >= 0 ? '+' : '' }}{{ pulse.expenseChange }}%
+          <!-- Expenses comparison -->
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-medium text-slate-500">Money Spent</span>
+              <span class="text-xs font-bold px-2 py-0.5 rounded-full"
+                :class="pulse.expenseChange <= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'">
+                {{ pulse.expenseChange <= 0 ? '↓ Down' : '↑ Up' }}
               </span>
             </div>
-          </div>
-          <div class="h-px bg-slate-100" />
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-slate-500">Net Savings</span>
-            <div class="flex items-center gap-1.5">
-              <UIcon
-                :name="pulse.netChange >= 0 ? 'i-lucide-trending-up' : 'i-lucide-trending-down'"
-                class="text-sm"
-                :class="pulse.netChange >= 0 ? 'text-emerald-500' : 'text-red-500'"
-              />
-              <span class="text-sm font-bold" :class="pulse.netChange >= 0 ? 'text-emerald-600' : 'text-red-500'">
-                {{ pulse.netChange >= 0 ? '+' : '' }}{{ pulse.netChange }}%
-              </span>
+            <div class="flex items-center gap-1.5 text-xs text-slate-600">
+              <ClientOnly>
+                <span class="text-slate-400">Last wk:</span>
+                <strong>{{ formatCurrency(pulse.lastWeekExpenses, auth.currency) }}</strong>
+                <UIcon name="i-lucide-arrow-right" class="text-slate-300 text-base" />
+                <span class="text-slate-400">This wk:</span>
+                <strong :class="pulse.expenseChange <= 0 ? 'text-emerald-600' : 'text-red-500'">{{ formatCurrency(pulse.thisWeekExpenses, auth.currency) }}</strong>
+              </ClientOnly>
             </div>
           </div>
         </div>
-        <p class="text-[10px] text-slate-400 mt-3">vs previous 7 days</p>
       </div>
 
       <!-- Smart Alerts -->
       <div class="bg-white rounded-xl border border-slate-200 p-4">
         <div class="flex items-center gap-2 mb-4">
           <UIcon name="i-lucide-bell-ring" class="text-amber-500 text-lg" />
-          <h3 class="text-sm font-bold text-slate-800">Smart Alerts</h3>
+          <h3 class="text-sm font-bold text-slate-800">Things to Watch</h3>
         </div>
         <div v-if="alerts.length > 0" class="space-y-2.5">
           <div

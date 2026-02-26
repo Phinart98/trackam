@@ -43,17 +43,27 @@ const chartOptions = {
     tooltip: {
       backgroundColor: '#1e293b',
       padding: 10,
-      cornerRadius: 8
+      cornerRadius: 8,
+      callbacks: {
+        label: (ctx: { dataset: { label: string }; parsed: { y: number } }) =>
+          ` ${ctx.dataset.label}: GH₵ ${ctx.parsed.y.toLocaleString('en-GH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+      }
     }
   },
   scales: {
     x: {
       grid: { display: false },
-      ticks: { font: { size: 12 } }
+      ticks: { font: { size: 11 } }
     },
     y: {
       grid: { color: 'rgba(0,0,0,0.04)' },
-      ticks: { font: { size: 11 } }
+      ticks: {
+        font: { size: 11 },
+        callback: (value: number | string) => {
+          const v = Number(value)
+          return v >= 1000 ? `₵${(v / 1000).toFixed(0)}k` : `₵${v}`
+        }
+      }
     }
   }
 }

@@ -131,7 +131,7 @@ export const useTransactionStore = defineStore('transactions', {
   actions: {
     seed() {
       if (!this.seeded) {
-        this.transactions = generateMockTransactions(6)
+        this.transactions = generateMockTransactions(2)
         this.seeded = true
       }
     },
@@ -141,7 +141,7 @@ export const useTransactionStore = defineStore('transactions', {
     },
 
     addTransaction(tx: Omit<Transaction, 'id'>) {
-      this.transactions.unshift({ ...tx, id: Date.now().toString() })
+      this.transactions.unshift({ ...tx, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` })
     },
 
     deleteTransaction(id: string) {

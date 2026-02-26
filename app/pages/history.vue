@@ -5,6 +5,8 @@ import { getCategoryById } from '~/utils/categories'
 
 type Filter = 'all' | 'income' | 'expense'
 
+const PAGE_SIZE = 30
+
 const tx = useTransactionStore()
 const auth = useAuthStore()
 const toast = useToast()
@@ -12,6 +14,9 @@ const toast = useToast()
 const searchQuery = ref('')
 const activeFilter = ref<Filter>('all')
 const expandedId = ref<string | null>(null)
+const visibleCount = ref(PAGE_SIZE)
+const sentinel = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
 
 function toggleExpand(id: string) {
   expandedId.value = expandedId.value === id ? null : id
@@ -31,9 +36,18 @@ const filtered = computed(() => {
   return list
 })
 
+// Reset to first page whenever filters change
+watch([searchQuery, activeFilter], () => {
+  visibleCount.value = PAGE_SIZE
+  expandedId.value = null
+})
+
+const visibleFiltered = computed(() => filtered.value.slice(0, visibleCount.value))
+const hasMore = computed(() => visibleCount.value < filtered.value.length)
+
 const grouped = computed(() => {
   const groups: { label: string; transactions: Transaction[] }[] = []
-  filtered.value.forEach(t => {
+  visibleFiltered.value.forEach(t => {
     const label = formatDateGroupLabel(t.date)
     const existing = groups.find(g => g.label === label)
     if (existing) existing.transactions.push(t)
@@ -48,10 +62,29 @@ const counts = computed(() => ({
   expense: tx.sorted.filter(t => t.type === 'expense').length
 }))
 
+function loadMore() {
+  visibleCount.value = Math.min(visibleCount.value + PAGE_SIZE, filtered.value.length)
+}
+
 function deleteTransaction(id: string) {
   tx.deleteTransaction(id)
   toast.add({ title: 'Transaction deleted', color: 'neutral' })
 }
+
+onMounted(() => {
+  observer = new IntersectionObserver(
+    (entries) => { if (entries[0]?.isIntersecting && hasMore.value) loadMore() },
+    { rootMargin: '200px' }
+  )
+  if (sentinel.value) observer.observe(sentinel.value)
+})
+
+// Re-attach observer after sentinel mounts (it only renders when there's more to load)
+watch(sentinel, (el) => {
+  if (el && observer) observer.observe(el)
+})
+
+onUnmounted(() => observer?.disconnect())
 </script>
 
 <template>
@@ -98,6 +131,11 @@ function deleteTransaction(id: string) {
     </div>
 
     <template v-else>
+      <!-- Count indicator -->
+      <p class="text-xs text-slate-400 mb-3">
+        Showing {{ visibleFiltered.length }} of {{ filtered.length }} transactions
+      </p>
+
       <!-- Desktop: table -->
       <div class="hidden lg:block bg-white rounded-xl border border-slate-200 overflow-hidden">
         <table class="w-full text-sm">
@@ -113,7 +151,7 @@ function deleteTransaction(id: string) {
           </thead>
           <tbody class="divide-y divide-slate-50">
             <tr
-              v-for="t in filtered"
+              v-for="t in visibleFiltered"
               :key="t.id"
               class="group hover:bg-slate-50 transition-colors"
             >
@@ -154,6 +192,9 @@ function deleteTransaction(id: string) {
         </table>
       </div>
 
+      <!-- Desktop load-more sentinel -->
+      <div ref="sentinel" class="hidden lg:block" />
+
       <!-- Mobile: grouped card list -->
       <div class="space-y-4 lg:hidden">
         <div v-for="group in grouped" :key="group.label">
@@ -188,7 +229,7 @@ function deleteTransaction(id: string) {
                 </span>
                 <!-- Description + time -->
                 <div class="flex-1 min-w-0 py-3">
-                  <p class="text-sm font-medium text-slate-800 truncate">{{ t.description }}</p>
+                  <p class="text-[15px] font-medium text-slate-800 truncate">{{ t.description }}</p>
                   <p class="text-xs text-slate-400 mt-0.5">{{ formatRelativeTime(t.date) }}</p>
                 </div>
                 <!-- Amount + chevron -->
@@ -236,6 +277,19 @@ function deleteTransaction(id: string) {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Mobile sentinel + load-more indicator -->
+      <div class="lg:hidden">
+        <div v-if="hasMore" ref="sentinel" class="py-6 flex flex-col items-center gap-2">
+          <div class="flex gap-1">
+            <span v-for="i in 3" :key="i" class="w-1.5 h-1.5 rounded-full bg-slate-300 animate-bounce" :style="{ animationDelay: `${(i-1) * 0.15}s` }" />
+          </div>
+          <p class="text-xs text-slate-400">Loading more…</p>
+        </div>
+        <div v-else class="py-6 text-center">
+          <p class="text-xs text-slate-400">All {{ filtered.length }} transactions loaded</p>
         </div>
       </div>
     </template>

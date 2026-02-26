@@ -6,6 +6,8 @@ const { askAdvisor } = useAI()
 
 const userInput = ref('')
 const isThinking = ref(false)
+const isStreaming = ref(false)
+const streamingId = ref<string | null>(null)
 const messagesEl = ref<HTMLElement | null>(null)
 
 const suggestions = [
@@ -15,9 +17,23 @@ const suggestions = [
   'What\'s my profit margin?'
 ]
 
+async function streamText(msgId: string, fullText: string) {
+  isStreaming.value = true
+  streamingId.value = msgId
+  const charDelay = Math.max(8, Math.min(25, 1200 / fullText.length))
+  for (let i = 1; i <= fullText.length; i++) {
+    chat.updateMessageContent(msgId, fullText.slice(0, i))
+    if (i % 3 === 0) scrollToBottom()
+    await new Promise(r => setTimeout(r, charDelay))
+  }
+  isStreaming.value = false
+  streamingId.value = null
+  scrollToBottom()
+}
+
 async function send(text?: string) {
   const message = text ?? userInput.value.trim()
-  if (!message || isThinking.value) return
+  if (!message || isThinking.value || isStreaming.value) return
 
   userInput.value = ''
   chat.addMessage('user', message)
@@ -33,11 +49,20 @@ async function send(text?: string) {
     currency: auth.currency
   }
 
-  const reply = await askAdvisor(message, context)
-  chat.addMessage('assistant', reply)
-  isThinking.value = false
-  await nextTick()
-  scrollToBottom()
+  try {
+    const reply = await askAdvisor(message, context)
+    isThinking.value = false
+    chat.addMessage('assistant', '')
+    const lastMsg = chat.messages[chat.messages.length - 1]!
+    await nextTick()
+    await streamText(lastMsg.id, reply)
+  }
+  catch {
+    isThinking.value = false
+    chat.addMessage('assistant', 'Sorry, I had trouble processing that. Please try again.')
+    await nextTick()
+    scrollToBottom()
+  }
 }
 
 function scrollToBottom() {
@@ -48,9 +73,10 @@ function scrollToBottom() {
   })
 }
 
-// Render markdown bold (**text**) safely (content is locally generated)
+// Render markdown bold (**text**) — only used for assistant messages (locally generated, not user input)
 function renderMarkdown(text: string) {
-  return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')
 }
 </script>
 
@@ -101,13 +127,19 @@ function renderMarkdown(text: string) {
         class="flex"
         :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
       >
+        <!-- User messages: plain text (no v-html) -->
         <div
-          class="max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed"
-          :class="msg.role === 'user'
-            ? 'bg-emerald-500 text-white rounded-br-sm'
-            : 'bg-slate-100 text-slate-800 rounded-bl-sm'"
-          v-html="msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content"
-        />
+          v-if="msg.role === 'user'"
+          class="max-w-[80%] px-4 py-3 rounded-2xl rounded-br-sm text-[15px] leading-relaxed bg-emerald-500 text-white"
+        >{{ msg.content }}</div>
+        <!-- Assistant messages: markdown rendered (HTML-escaped first, then bold applied) -->
+        <div
+          v-else
+          class="max-w-[80%] px-4 py-3 rounded-2xl rounded-bl-sm text-[15px] leading-relaxed bg-slate-100 text-slate-800"
+        >
+          <span v-html="renderMarkdown(msg.content)" />
+          <span v-if="streamingId === msg.id" class="inline-block w-0.5 h-4 bg-slate-400 ml-0.5 align-middle animate-pulse" />
+        </div>
       </div>
 
       <!-- Typing indicator -->
@@ -130,7 +162,7 @@ function renderMarkdown(text: string) {
           @keydown.enter="send()"
         >
         <button
-          :disabled="!userInput.trim() || isThinking"
+          :disabled="!userInput.trim() || isThinking || isStreaming"
           class="w-11 h-11 rounded-xl bg-emerald-500 flex items-center justify-center text-white disabled:opacity-50 active:scale-95 transition-all shadow-sm"
           @click="send()"
         >

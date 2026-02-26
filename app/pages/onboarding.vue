@@ -15,7 +15,7 @@ const selectedBusinessType = ref('')
 const monthlyBudget = ref('')
 
 const currencies = [
-  { code: 'GHS', label: 'Ghana Cedi', symbol: 'GH₵', flag: '🇬🇭' },
+  { code: 'GHS', label: 'Ghanaian Cedi', symbol: 'GH₵', flag: '🇬🇭' },
   { code: 'NGN', label: 'Nigerian Naira', symbol: '₦', flag: '🇳🇬' },
   { code: 'KES', label: 'Kenyan Shilling', symbol: 'KSh', flag: '🇰🇪' },
   { code: 'UGX', label: 'Ugandan Shilling', symbol: 'USh', flag: '🇺🇬' },
