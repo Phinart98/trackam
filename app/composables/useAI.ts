@@ -2,6 +2,29 @@ import type { ParsedTransaction } from '~/types'
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
+// ─── Production API helpers ───────────────────────────────────────────────────
+// Only called when NUXT_PUBLIC_API_BASE_URL is set (Stage 3 backend is live)
+
+async function getAuthToken(): Promise<string | null> {
+  try {
+    const supabase = useSupabase()
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token ?? null
+  } catch {
+    return null
+  }
+}
+
+async function apiFetch<T>(baseUrl: string, path: string, body: unknown): Promise<T> {
+  const token = await getAuthToken()
+  return $fetch<T>(`${baseUrl}${path}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body
+  })
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Keyword → category mappings (simulates AI understanding of African informal economy)
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
   transport: ['trotro', 'uber', 'bolt', 'bus', 'taxi', 'okada', 'boda', 'matatu', 'danfo', 'fare', 'fuel', 'petrol', 'transport'],
@@ -46,13 +69,11 @@ function detectType(text: string, category: string): 'income' | 'expense' {
   if (incomeScore > expenseScore) return 'income'
   if (expenseScore > incomeScore) return 'expense'
 
-  // Category-based defaults
   if (['sales', 'momo', 'salary', 'other_income'].includes(category)) return 'income'
   return 'expense'
 }
 
 function extractAmount(text: string): number {
-  // Match numbers with optional currency symbols: "150 cedis", "GH₵ 45", "5 GHS", "2,500"
   const patterns = [
     /(?:gh[s₵]|ghs|cedis?|naira|ksh|ugx|₦|₵)\s*(\d[\d,]*(?:\.\d+)?)/gi,
     /(\d[\d,]*(?:\.\d+)?)\s*(?:gh[s₵]|ghs|cedis?|naira|ksh)/gi,
@@ -77,12 +98,10 @@ function calcConfidence(text: string, category: string, amount: number): number 
   if (category !== 'other_expense' && category !== 'other_income') base += 8
   const wordCount = text.trim().split(/\s+/).length
   if (wordCount >= 4) base += 5
-  // Add some realistic variance
   base += Math.floor(Math.random() * 6) - 3
   return Math.min(Math.max(base, 72), 99)
 }
 
-// Hardcoded image parsing results to demo vision AI
 const IMAGE_PARSE_RESULTS: ParsedTransaction[] = [
   { amount: 350, category: 'momo', description: 'MTN MoMo Transfer Received', type: 'income', vendor: 'MTN Mobile Money', date: new Date().toISOString(), confidence: 99 },
   { amount: 85.50, category: 'food', description: 'Grocery receipt — Makola Supermarket', type: 'expense', vendor: 'Makola Supermarket', date: new Date().toISOString(), confidence: 94 },
@@ -90,7 +109,19 @@ const IMAGE_PARSE_RESULTS: ParsedTransaction[] = [
 ]
 
 export const useAI = () => {
+  // useRuntimeConfig() must be called inside the composable (Nuxt context required)
+  const config = useRuntimeConfig()
+  const apiBaseUrl = config.public.apiBaseUrl as string
+  const useRealBackend = !!apiBaseUrl
+
   const parseText = async (input: string): Promise<ParsedTransaction> => {
+    if (useRealBackend) {
+      const auth = useAuthStore()
+      return apiFetch<ParsedTransaction>(apiBaseUrl, '/api/ai/parse-text', {
+        text: input,
+        currency: auth.profile?.currency ?? 'GHS'
+      })
+    }
     await delay(1500)
 
     const category = detectCategory(input)
@@ -98,7 +129,6 @@ export const useAI = () => {
     const amount = extractAmount(input)
     const confidence = calcConfidence(input, category, amount)
 
-    // Remap income categories if type is income
     const finalCategory = type === 'income' && ['food', 'transport', 'market', 'airtime', 'bills', 'health', 'education', 'supplies', 'personal', 'gifts'].includes(category)
       ? 'sales'
       : category
@@ -113,7 +143,17 @@ export const useAI = () => {
     }
   }
 
-  const parseImage = async (_file: File): Promise<ParsedTransaction> => {
+  const parseImage = async (file: File): Promise<ParsedTransaction> => {
+    if (useRealBackend) {
+      const token = await getAuthToken()
+      const formData = new FormData()
+      formData.append('file', file)
+      return $fetch<ParsedTransaction>(`${apiBaseUrl}/api/ai/parse-image`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData
+      })
+    }
     await delay(2000)
     const result = IMAGE_PARSE_RESULTS[Math.floor(Math.random() * IMAGE_PARSE_RESULTS.length)]!
     return {
@@ -131,6 +171,13 @@ export const useAI = () => {
     question: string,
     context: { totalIncome: number; totalExpenses: number; balance: number; topCategory: string; transactionCount: number; currency: string },
   ): Promise<string> => {
+    if (useRealBackend) {
+      const res = await apiFetch<{ reply: string; sessionId: string }>(apiBaseUrl, '/api/ai/advisor', {
+        question,
+        context
+      })
+      return res.reply
+    }
     await delay(1200 + Math.random() * 800)
 
     const { totalIncome, totalExpenses, balance, topCategory, transactionCount, currency } = context
@@ -147,7 +194,7 @@ export const useAI = () => {
 
     if (q.includes('save') || q.includes('saving')) {
       const savingsTarget = totalIncome * 0.2
-      return `A good rule is to save **20% of income** — for you, that's about **${fmt(savingsTarget)}** this month. Based on your transactions, your biggest saving opportunity is reducing ${topCategory} expenses. Even cutting 10% there would save you **${fmt(totalExpenses * 0.1)}** monthly. Consider a separate "savings wallet" and move money there on the day you receive income.`
+      return `A good rule is to save **20% of income** — for you, that's about **${fmt(savingsTarget)}** this month. Based on your transactions, your biggest saving opportunity is reducing ${topCategory} expenses. Even cutting 10% there would save you **${fmt(totalExpenses * 0.1)}** monthly. Consider a separate \"savings wallet\" and move money there on the day you receive income.`
     }
 
     if (q.includes('compare') || q.includes('week') || q.includes('last')) {

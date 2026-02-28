@@ -4,8 +4,38 @@ export default defineNuxtConfig({
     '@nuxt/eslint',
     '@nuxt/ui',
     '@pinia/nuxt',
-    'pinia-plugin-persistedstate/nuxt'
+    'pinia-plugin-persistedstate/nuxt',
+    '@vite-pwa/nuxt'
   ],
+
+  runtimeConfig: {
+    public: {
+      supabaseUrl: '',
+      supabaseAnonKey: '',
+      apiBaseUrl: ''
+    }
+  },
+
+  pwa: {
+    registerType: 'autoUpdate',
+    manifest: {
+      name: 'TrackAm',
+      short_name: 'TrackAm',
+      description: 'AI-powered financial tracker for Africa\'s informal economy',
+      theme_color: '#10b981',
+      background_color: '#f8fafc',
+      display: 'standalone',
+      start_url: '/',
+      icons: [
+        { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+      ]
+    },
+    workbox: {
+      navigateFallback: '/',
+      globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}']
+    }
+  },
 
   devtools: {
     enabled: false
