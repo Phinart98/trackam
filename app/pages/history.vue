@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import type { Transaction } from '~/types'
 import { formatDateGroupLabel, formatCurrency, formatRelativeTime } from '~/utils/formatters'
-import { getCategoryById } from '~/utils/categories'
 
 type Filter = 'all' | 'income' | 'expense'
 
 const PAGE_SIZE = 30
 
 const tx = useTransactionStore()
+const catStore = useCategoryStore()
 const auth = useAuthStore()
 const toast = useToast()
+const { confirm } = useConfirm()
 
 const searchQuery = ref('')
 const activeFilter = ref<Filter>('all')
@@ -66,8 +67,10 @@ function loadMore() {
   visibleCount.value = Math.min(visibleCount.value + PAGE_SIZE, filtered.value.length)
 }
 
-function deleteTransaction(id: string) {
-  tx.deleteTransaction(id)
+async function deleteTransaction(id: string) {
+  const ok = await confirm('Delete transaction?', { message: 'This cannot be undone.' })
+  if (!ok) return
+  tx.removeTransaction(id)
   toast.add({ title: 'Transaction deleted', color: 'neutral' })
 }
 
@@ -162,10 +165,10 @@ onUnmounted(() => observer?.disconnect())
               </td>
               <td class="px-4 py-3">
                 <div class="flex items-center gap-2">
-                  <span class="w-6 h-6 rounded-md flex items-center justify-center" :class="getCategoryById(t.category)?.bgColor ?? 'bg-slate-100'">
-                    <UIcon :name="getCategoryById(t.category)?.icon ?? 'i-lucide-circle'" class="text-xs" :class="getCategoryById(t.category)?.color ?? 'text-slate-400'" />
+                  <span class="w-6 h-6 rounded-md flex items-center justify-center" :class="catStore.byId(t.category)?.bgColor ?? 'bg-slate-100'">
+                    <UIcon :name="catStore.byId(t.category)?.icon ?? 'i-lucide-circle'" class="text-xs" :class="catStore.byId(t.category)?.color ?? 'text-slate-400'" />
                   </span>
-                  <span class="text-xs text-slate-600">{{ getCategoryById(t.category)?.name ?? t.category }}</span>
+                  <span class="text-xs text-slate-600">{{ catStore.byId(t.category)?.name ?? t.category }}</span>
                 </div>
               </td>
               <td class="px-4 py-3">
@@ -223,9 +226,9 @@ onUnmounted(() => observer?.disconnect())
               >
                 <!-- Category icon -->
                 <span class="flex items-center justify-center w-10 h-10 rounded-xl shrink-0 mr-3 my-3"
-                  :class="getCategoryById(t.category)?.bgColor ?? 'bg-slate-100'">
-                  <UIcon :name="getCategoryById(t.category)?.icon ?? 'i-lucide-circle-ellipsis'" class="text-lg"
-                    :class="getCategoryById(t.category)?.color ?? 'text-slate-400'" />
+                  :class="catStore.byId(t.category)?.bgColor ?? 'bg-slate-100'">
+                  <UIcon :name="catStore.byId(t.category)?.icon ?? 'i-lucide-circle-ellipsis'" class="text-lg"
+                    :class="catStore.byId(t.category)?.color ?? 'text-slate-400'" />
                 </span>
                 <!-- Description + time -->
                 <div class="flex-1 min-w-0 py-3">
@@ -252,7 +255,7 @@ onUnmounted(() => observer?.disconnect())
                 <!-- Meta chips -->
                 <div class="flex flex-wrap gap-1.5 mb-3">
                   <span class="text-[11px] font-medium px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-600">
-                    {{ getCategoryById(t.category)?.name ?? t.category }}
+                    {{ catStore.byId(t.category)?.name ?? t.category }}
                   </span>
                   <span v-if="t.vendor" class="text-[11px] font-medium px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-600">
                     {{ t.vendor }}

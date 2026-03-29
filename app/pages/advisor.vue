@@ -81,7 +81,7 @@ function renderMarkdown(text: string) {
 </script>
 
 <template>
-  <div class="flex flex-col h-[calc(100vh-130px)] lg:h-[calc(100vh-60px)] max-w-2xl lg:mx-auto">
+  <div class="flex flex-col h-[calc(100dvh-130px)] lg:h-[calc(100dvh-60px)] max-w-2xl lg:mx-auto">
     <!-- Header -->
     <div class="px-4 pt-4 pb-3 border-b border-slate-100">
       <div class="flex items-center gap-2">
@@ -152,7 +152,7 @@ function renderMarkdown(text: string) {
     </div>
 
     <!-- Input bar -->
-    <div class="px-4 py-3 border-t border-slate-100 bg-white">
+    <div class="px-4 py-3 border-t border-slate-100 bg-white" style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom))">
       <div class="flex gap-2">
         <input
           v-model="userInput"

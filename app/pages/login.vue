@@ -14,21 +14,23 @@ const loading = ref(false)
 const isSignIn = computed(() => tab.value === 'signin')
 
 async function submit() {
-  if (!email.value) return
+  if (!email.value || !password.value) return
   loading.value = true
   try {
-    await auth.login(email.value, password.value)
+    if (isSignIn.value) {
+      await auth.login(email.value, password.value)
+    } else {
+      await auth.signUp(email.value, password.value, name.value || undefined)
+    }
     if (!auth.profile?.onboarded) {
       router.push('/onboarding')
-    }
-    else {
+    } else {
       router.push('/dashboard')
     }
-  }
-  catch {
-    toast.add({ title: 'Something went wrong', color: 'error' })
-  }
-  finally {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Something went wrong'
+    toast.add({ title: message, color: 'error' })
+  } finally {
     loading.value = false
   }
 }
@@ -188,11 +190,11 @@ onUnmounted(() => clearInterval(intervalId))
 
           <button
             type="submit"
-            :disabled="loading || !email"
+            :disabled="loading || !email || !password"
             class="mt-2 w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold text-base shadow-lg shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <UIcon v-if="loading" name="i-lucide-loader-circle" class="animate-spin text-lg" />
-            <span>{{ loading ? 'Signing in…' : (isSignIn ? 'Sign In' : 'Create Account') }}</span>
+            <span>{{ loading ? (isSignIn ? 'Signing in…' : 'Creating account…') : (isSignIn ? 'Sign In' : 'Create Account') }}</span>
             <UIcon v-if="!loading" name="i-lucide-arrow-right" class="text-lg" />
           </button>
         </form>

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Transaction } from '~/types'
-import { getCategoryById } from '~/utils/categories'
 import { formatCurrency, formatRelativeTime } from '~/utils/formatters'
 
 const props = withDefaults(defineProps<{
@@ -11,7 +10,8 @@ const props = withDefaults(defineProps<{
 defineEmits<{ delete: [id: string] }>()
 
 const auth = useAuthStore()
-const category = computed(() => getCategoryById(props.transaction.category))
+const catStore = useCategoryStore()
+const category = computed(() => catStore.byId(props.transaction.category))
 const isIncome = computed(() => props.transaction.type === 'income')
 
 const sourceLabel = computed(() => {

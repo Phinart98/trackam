@@ -5,17 +5,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 // ─── Production API helpers ───────────────────────────────────────────────────
 // Only called when NUXT_PUBLIC_API_BASE_URL is set (Stage 3 backend is live)
 
-async function getAuthToken(): Promise<string | null> {
-  try {
-    const supabase = useSupabase()
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token ?? null
-  } catch {
-    return null
-  }
-}
-
-async function apiFetch<T>(baseUrl: string, path: string, body: unknown): Promise<T> {
+async function apiFetch<T>(baseUrl: string, path: string, body: Record<string, unknown> | FormData): Promise<T> {
   const token = await getAuthToken()
   return $fetch<T>(`${baseUrl}${path}`, {
     method: 'POST',
@@ -81,12 +71,15 @@ function extractAmount(text: string): number {
   ]
 
   for (const pattern of patterns) {
-    const match = text.match(pattern)
-    if (match) {
-      const num = match[0].replace(/[^0-9.]/g, '')
-      const parsed = parseFloat(num)
-      if (!isNaN(parsed) && parsed > 0) return parsed
+    let best = 0
+    const re = new RegExp(pattern.source, pattern.flags)
+    let m: RegExpExecArray | null
+    while ((m = re.exec(text)) !== null) {
+      const raw = (m[1] ?? m[0]).replace(/[^0-9.]/g, '')
+      const num = parseFloat(raw)
+      if (!isNaN(num) && num > best) best = num
     }
+    if (best > 0) return best
   }
 
   return 0
@@ -98,7 +91,6 @@ function calcConfidence(text: string, category: string, amount: number): number 
   if (category !== 'other_expense' && category !== 'other_income') base += 8
   const wordCount = text.trim().split(/\s+/).length
   if (wordCount >= 4) base += 5
-  base += Math.floor(Math.random() * 6) - 3
   return Math.min(Math.max(base, 72), 99)
 }
 
@@ -106,6 +98,8 @@ const IMAGE_PARSE_RESULTS: ParsedTransaction[] = [
   { amount: 350, category: 'momo', description: 'MTN MoMo Transfer Received', type: 'income', vendor: 'MTN Mobile Money', date: new Date().toISOString(), confidence: 99 },
   { amount: 85.50, category: 'food', description: 'Grocery receipt — Makola Supermarket', type: 'expense', vendor: 'Makola Supermarket', date: new Date().toISOString(), confidence: 94 },
   { amount: 45, category: 'market', description: 'Receipt — fabric and accessories', type: 'expense', vendor: 'Kantamanto Market', date: new Date().toISOString(), confidence: 87 },
+  // FX mock — tests the blue conversion pill (USD receipt → GHS)
+  { amount: 462, category: 'supplies', description: 'Amazon order — business supplies', type: 'expense', vendor: 'Amazon.com', date: new Date().toISOString(), confidence: 91, originalCurrency: 'USD', originalAmount: 30, exchangeRate: 15.4 },
 ]
 
 export const useAI = () => {
@@ -113,13 +107,13 @@ export const useAI = () => {
   const config = useRuntimeConfig()
   const apiBaseUrl = config.public.apiBaseUrl as string
   const useRealBackend = !!apiBaseUrl
+  const auth = useAuthStore()
 
   const parseText = async (input: string): Promise<ParsedTransaction> => {
     if (useRealBackend) {
-      const auth = useAuthStore()
       return apiFetch<ParsedTransaction>(apiBaseUrl, '/api/ai/parse-text', {
         text: input,
-        currency: auth.profile?.currency ?? 'GHS'
+        currency: auth.profile?.currency ?? 'GHS',
       })
     }
     await delay(1500)
@@ -145,26 +139,14 @@ export const useAI = () => {
 
   const parseImage = async (file: File): Promise<ParsedTransaction> => {
     if (useRealBackend) {
-      const token = await getAuthToken()
       const formData = new FormData()
       formData.append('file', file)
-      return $fetch<ParsedTransaction>(`${apiBaseUrl}/api/ai/parse-image`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData
-      })
+      formData.append('currency', auth.profile?.currency ?? 'GHS')
+      return apiFetch<ParsedTransaction>(apiBaseUrl, '/api/ai/parse-image', formData)
     }
     await delay(2000)
     const result = IMAGE_PARSE_RESULTS[Math.floor(Math.random() * IMAGE_PARSE_RESULTS.length)]!
-    return {
-      amount: result.amount,
-      category: result.category,
-      description: result.description,
-      type: result.type,
-      vendor: result.vendor,
-      date: new Date().toISOString(),
-      confidence: result.confidence,
-    }
+    return { ...result, date: new Date().toISOString() }
   }
 
   const askAdvisor = async (
@@ -209,5 +191,33 @@ export const useAI = () => {
     return `Based on your ${transactionCount} transactions, you have **${fmt(totalIncome)}** in income and **${fmt(totalExpenses)}** in expenses this period. Your net balance is **${fmt(balance)}**. What specific aspect of your finances would you like to understand better? I can help with savings tips, spending analysis, or profit tracking.`
   }
 
-  return { parseText, parseImage, askAdvisor }
+  const generateInsight = async (payload: {
+    currency: string
+    totalIncome: number
+    totalExpenses: number
+    balance: number
+    burnPercent: number
+    daysRemaining: number
+    topCategoryName: string
+    topCategoryPercent: number
+    trend: string
+    transactionCount: number
+    recentAnomaly: string | null
+  }): Promise<string> => {
+    if (useRealBackend) {
+      const res = await apiFetch<{ insight: string }>(apiBaseUrl, '/api/ai/insight', payload)
+      return res.insight
+    }
+    // Mock: derive a rule-based insight so it still feels live
+    await delay(800)
+    const { totalIncome, totalExpenses, balance, burnPercent, daysRemaining, topCategoryName, currency } = payload
+    const fmt = (n: number) => `${currency === 'GHS' ? 'GH₵' : currency} ${n.toFixed(2)}`
+    if (payload.transactionCount === 0) return 'Add your first transaction to get a personalised insight.'
+    if (burnPercent > 100) return `You've gone over budget and have ${daysRemaining} days left in the month. Your ${topCategoryName} spending is the main driver — consider pausing non-essential purchases until the month resets.`
+    if (burnPercent > 80) return `You're at ${burnPercent}% of your monthly budget with ${daysRemaining} days to go. At this rate your top category (${topCategoryName}) could push you over — watch it closely.`
+    if (balance > 0) return `You're ${fmt(balance)} in the green this month with ${topCategoryName} as your biggest expense. Keep it up — consider setting aside ${fmt(totalIncome * 0.1)} as savings before the month ends.`
+    return `Your expenses (${fmt(totalExpenses)}) are outpacing income (${fmt(totalIncome)}) this month. ${topCategoryName} is your largest cost — tracking it daily could help you spot where to cut.`
+  }
+
+  return { parseText, parseImage, askAdvisor, generateInsight }
 }

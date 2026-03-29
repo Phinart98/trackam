@@ -17,7 +17,10 @@ export interface Category {
   icon: string
   color: string
   bgColor: string
-  type: 'income' | 'expense' | 'both'
+  dotColor: string
+  type: 'income' | 'expense'
+  isDefault?: boolean
+  keywords?: string[]
 }
 
 export interface UserProfile {
@@ -36,12 +39,30 @@ export interface ChatMessage {
   timestamp: string
 }
 
+export interface Goal {
+  id: string
+  name: string
+  targetAmount: number
+  currentAmount: number
+  currency: string
+  icon: string
+  color: string
+  bgColor: string
+  dotColor: string
+  deadline?: string
+  createdAt: string
+}
+
 export interface ParsedTransaction {
   amount: number
+  currency?: string
   category: string
   description: string
   type: 'income' | 'expense'
   vendor?: string
   date: string
   confidence: number
+  originalCurrency?: string
+  originalAmount?: number
+  exchangeRate?: number
 }

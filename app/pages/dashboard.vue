@@ -1,9 +1,49 @@
 <script setup lang="ts">
-import { formatCurrency } from '~/utils/formatters'
-import { calculateBurnRate, trendDirection, computeHealthScore, weekOverWeek, detectAnomalies } from '~/utils/forecasting'
+import { formatCurrency, ringOffset } from '~/utils/formatters'
+import { computeHealthScore, weekOverWeek, detectAnomalies } from '~/utils/forecasting'
+import { COLOR_PRESETS } from '~/stores/categories'
 
 const auth = useAuthStore()
 const tx = useTransactionStore()
+const goalStore = useGoalStore()
+const { generateInsight } = useAI()
+
+const insightLoading = ref(false)
+
+const SIX_HOURS = 6 * 60 * 60 * 1000
+
+async function refreshInsightIfStale() {
+  if (tx.transactions.length === 0) return
+  const stale = Date.now() - tx.aiInsightAt > SIX_HOURS
+  const txCountChanged = tx.transactions.length !== tx.aiInsightTxCount
+  if (!stale && !txCountChanged && tx.aiInsight) return
+
+  insightLoading.value = true
+  try {
+    const top = tx.categoryBreakdown[0]
+    const anomaly = detectAnomalies(tx.transactions, auth.currency)[0]?.message ?? null
+    const text = await generateInsight({
+      currency: auth.currency,
+      totalIncome: tx.totalIncome,
+      totalExpenses: tx.totalExpenses,
+      balance: tx.balance,
+      burnPercent: tx.forecast.burnPercent,
+      daysRemaining: tx.forecast.daysRemaining,
+      topCategoryName: top?.name ?? 'General',
+      topCategoryPercent: top?.percentage ?? 0,
+      trend: tx.forecast.trend,
+      transactionCount: tx.transactions.length,
+      recentAnomaly: anomaly,
+    })
+    tx.aiInsight = text
+    tx.aiInsightAt = Date.now()
+    tx.aiInsightTxCount = tx.transactions.length
+  } catch {
+    // keep showing last cached insight or fallback
+  } finally {
+    insightLoading.value = false
+  }
+}
 
 const ranges = ['1W', '1M', '3M', '6M'] as const
 
@@ -11,7 +51,6 @@ const ranges = ['1W', '1M', '3M', '6M'] as const
 const displayBalance = ref(0)
 const displayIncome = ref(0)
 const displayExpenses = ref(0)
-let animatedOnce = false
 
 function animateCounter(target: number, setter: (v: number) => void, duration = 1200) {
   const start = performance.now()
@@ -26,23 +65,20 @@ function animateCounter(target: number, setter: (v: number) => void, duration = 
 }
 
 onMounted(() => {
-  if (!animatedOnce) {
-    animatedOnce = true
-    animateCounter(tx.balance, v => { displayBalance.value = v })
-    animateCounter(tx.totalIncome, v => { displayIncome.value = v })
-    animateCounter(tx.totalExpenses, v => { displayExpenses.value = v })
-  }
+  animateCounter(tx.balance, v => { displayBalance.value = v })
+  animateCounter(tx.totalIncome, v => { displayIncome.value = v })
+  animateCounter(tx.totalExpenses, v => { displayExpenses.value = v })
+  refreshInsightIfStale()
 })
 
-const forecast = computed(() => {
-  const budget = auth.profile?.monthlyBudget ?? 0
-  return calculateBurnRate(tx.transactions, budget)
-})
-
-const trend = computed(() => trendDirection(tx.transactions))
+// Keep display in sync when data loads after mount (no re-animation)
+watch(
+  () => [tx.balance, tx.totalIncome, tx.totalExpenses] as const,
+  ([b, i, e]) => { displayBalance.value = b; displayIncome.value = i; displayExpenses.value = e }
+)
 
 const insightText = computed(() => {
-  const t = trend.value
+  const t = tx.forecast.trend
   const top = tx.categoryBreakdown[0]
   if (t === 'declining' && top) {
     return `Your spending is trending up. ${top.name} accounts for ${top.percentage}% of expenses — consider reviewing it.`
@@ -57,7 +93,7 @@ const insightText = computed(() => {
 })
 
 const burnBarColor = computed(() => {
-  const pct = forecast.value.burnPercent
+  const pct = tx.forecast.burnPercent
   if (pct > 100) return 'bg-red-400'
   if (pct > 80) return 'bg-amber-400'
   return 'bg-emerald-400'
@@ -67,11 +103,16 @@ const healthScore = computed(() => computeHealthScore(tx.transactions, auth.prof
 const pulse = computed(() => weekOverWeek(tx.transactions))
 const alerts = computed(() => detectAnomalies(tx.transactions, auth.currency))
 
-const healthStroke = computed(() => {
-  const circumference = 2 * Math.PI * 54
-  const offset = circumference - (healthScore.value.score / 100) * circumference
-  return { circumference, offset }
-})
+const freeCash = computed(() => tx.balance - goalStore.totalSaved)
+
+function goalDotColor(goal: { color: string; dotColor?: string }): string {
+  return goal.dotColor ?? COLOR_PRESETS.find(p => p.color === goal.color)?.dotColor ?? '#64748b'
+}
+
+const healthStroke = computed(() => ({
+  circumference: 2 * Math.PI * 54,
+  offset: ringOffset(healthScore.value.score, 54),
+}))
 
 const healthRingColor = computed(() => {
   const s = healthScore.value.score
@@ -80,16 +121,16 @@ const healthRingColor = computed(() => {
   return 'stroke-red-500'
 })
 
-// Plain-language narratives for non-data-literate users
 const activityNarrative = computed(() => {
   const d = tx.chartData
   const totalInc = d.income.reduce((s, v) => s + v, 0)
   const totalExp = d.expenses.reduce((s, v) => s + v, 0)
-  const rangeLabel = tx.chartRange === '1W' ? 'this week' : tx.chartRange === '1M' ? 'this month' : tx.chartRange === '3M' ? 'these 3 months' : 'these 6 months'
+  const labelMap: Record<string, string> = { '1W': 'This week', '1M': 'This month', '3M': 'These 3 months', '6M': 'These 6 months' }
+  const label = labelMap[tx.chartRange] ?? 'This period'
   if (totalInc === 0 && totalExp === 0) return 'No activity yet for this period.'
-  if (totalInc > totalExp) return `${rangeLabel.charAt(0).toUpperCase() + rangeLabel.slice(1)}, you earned more than you spent — that's good!`
-  if (totalExp > totalInc) return `${rangeLabel.charAt(0).toUpperCase() + rangeLabel.slice(1)}, you spent more than you earned — be careful.`
-  return `${rangeLabel.charAt(0).toUpperCase() + rangeLabel.slice(1)}, your income and spending are about equal.`
+  if (totalInc > totalExp) return `${label}, you earned more than you spent — that's good!`
+  if (totalExp > totalInc) return `${label}, you spent more than you earned — be careful.`
+  return `${label}, your income and spending are about equal.`
 })
 
 const categoryNarrative = computed(() => {
@@ -101,11 +142,17 @@ const categoryNarrative = computed(() => {
 })
 
 const healthExplanation = computed(() => {
+  if (tx.transactions.length === 0) return 'Add some transactions to see your financial health score.'
   const s = healthScore.value.score
   if (s >= 70) return 'You are earning well, spending carefully, and tracking your money. Keep going!'
   if (s >= 40) return 'You are doing okay, but there is room to spend less or earn more.'
   return 'Your spending is higher than your income. Try to cut costs or find more income this week.'
 })
+
+const hasWeeklyData = computed(() =>
+  pulse.value.thisWeekIncome > 0 || pulse.value.lastWeekIncome > 0 ||
+  pulse.value.thisWeekExpenses > 0 || pulse.value.lastWeekExpenses > 0
+)
 </script>
 
 <template>
@@ -136,13 +183,18 @@ const healthExplanation = computed(() => {
             <p class="text-4xl lg:text-5xl font-bold tracking-tight">
               {{ formatCurrency(displayBalance, auth.currency) }}
             </p>
+            <p v-if="goalStore.totalSaved > 0" class="text-emerald-200 text-xs mt-1.5">
+              <span class="opacity-75">Free cash:</span>
+              {{ formatCurrency(freeCash, auth.currency) }}
+              <span class="opacity-60 ml-1">· {{ formatCurrency(goalStore.totalSaved, auth.currency) }} in goals</span>
+            </p>
           </ClientOnly>
           <!-- trend badge -->
           <div class="flex items-center gap-1.5 mt-2">
             <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-              :class="trend === 'improving' ? 'bg-emerald-500/30 text-emerald-200' : trend === 'declining' ? 'bg-red-500/30 text-red-200' : 'bg-white/10 text-white/60'">
-              <UIcon :name="trend === 'improving' ? 'i-lucide-trending-down' : trend === 'declining' ? 'i-lucide-trending-up' : 'i-lucide-minus'" class="text-xs" />
-              {{ trend === 'improving' ? 'Spending down' : trend === 'declining' ? 'Spending up' : 'Stable' }}
+              :class="tx.forecast.trend === 'improving' ? 'bg-emerald-500/30 text-emerald-200' : tx.forecast.trend === 'declining' ? 'bg-red-500/30 text-red-200' : 'bg-white/10 text-white/60'">
+              <UIcon :name="tx.forecast.trend === 'improving' ? 'i-lucide-trending-down' : tx.forecast.trend === 'declining' ? 'i-lucide-trending-up' : 'i-lucide-minus'" class="text-xs" />
+              {{ tx.forecast.trend === 'improving' ? 'Spending down' : tx.forecast.trend === 'declining' ? 'Spending up' : 'Stable' }}
             </span>
           </div>
         </div>
@@ -190,11 +242,11 @@ const healthExplanation = computed(() => {
     <!-- AI Insight Card -->
     <div class="bg-gradient-to-r from-violet-50 to-emerald-50 border border-violet-100 rounded-xl p-4 mb-5 flex items-start gap-3">
       <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
-        <UIcon name="i-lucide-sparkles" class="text-violet-600 text-sm" />
+        <UIcon :name="insightLoading ? 'i-lucide-loader-circle' : 'i-lucide-sparkles'" class="text-violet-600 text-sm" :class="{ 'animate-spin': insightLoading }" />
       </div>
-      <div>
+      <div class="min-w-0">
         <p class="text-xs font-bold text-violet-700 mb-0.5">AI Insight</p>
-        <p class="text-sm text-slate-700 leading-relaxed">{{ insightText }}</p>
+        <p class="text-sm text-slate-700 leading-relaxed">{{ tx.aiInsight ?? insightText }}</p>
       </div>
     </div>
 
@@ -232,7 +284,7 @@ const healthExplanation = computed(() => {
           </div>
         </div>
         <p class="text-[13px] text-slate-500 leading-relaxed mb-3">{{ activityNarrative }}</p>
-        <ChartsWeeklyTrendChart :data="tx.chartData" />
+        <ChartsWeeklyTrendChart :data="tx.chartData" :currency="auth.currency" />
       </div>
 
       <!-- Forecast Card -->
@@ -240,21 +292,21 @@ const healthExplanation = computed(() => {
         <div class="flex items-center gap-2 mb-4">
           <UIcon name="i-lucide-calendar-check" class="text-amber-500 text-lg" />
           <h3 class="text-sm font-bold text-slate-800">Rest of This Month</h3>
-          <span class="ml-auto text-xs text-slate-400">{{ forecast.daysRemaining }}d left</span>
+          <span class="ml-auto text-xs text-slate-400">{{ tx.forecast.daysRemaining }}d left</span>
         </div>
 
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div class="bg-emerald-50 rounded-xl p-3">
             <p class="text-xs text-emerald-600 font-medium mb-1">Money Left End of Month</p>
             <ClientOnly>
-              <p class="text-lg font-bold text-emerald-700">{{ formatCurrency(Math.abs(forecast.projectedEndBalance), auth.currency) }}</p>
+              <p class="text-lg font-bold text-emerald-700">{{ formatCurrency(Math.abs(tx.forecast.projectedEndBalance), auth.currency) }}</p>
             </ClientOnly>
-            <p class="text-[10px] text-emerald-500 mt-0.5">{{ forecast.projectedEndBalance >= 0 ? 'projected profit' : 'projected deficit' }}</p>
+            <p class="text-[10px] text-emerald-500 mt-0.5">{{ tx.forecast.projectedEndBalance >= 0 ? 'projected profit' : 'projected deficit' }}</p>
           </div>
           <div class="bg-amber-50 rounded-xl p-3">
             <p class="text-xs text-amber-600 font-medium mb-1">You Spend Per Day</p>
             <ClientOnly>
-              <p class="text-lg font-bold text-amber-700">{{ formatCurrency(forecast.dailyAverage, auth.currency) }}</p>
+              <p class="text-lg font-bold text-amber-700">{{ formatCurrency(tx.forecast.dailyAverage, auth.currency) }}</p>
             </ClientOnly>
             <p class="text-[10px] text-amber-500 mt-0.5">per day average</p>
           </div>
@@ -264,13 +316,13 @@ const healthExplanation = computed(() => {
         <div class="mb-3">
           <div class="flex justify-between text-xs text-slate-500 mb-1.5">
             <span>Budget spent so far</span>
-            <span>{{ Math.min(forecast.burnPercent, 999) }}%</span>
+            <span>{{ Math.min(tx.forecast.burnPercent, 999) }}%</span>
           </div>
           <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
             <div
               class="h-full rounded-full transition-all duration-700"
               :class="burnBarColor"
-              :style="{ width: `${Math.min(forecast.burnPercent, 100)}%` }"
+              :style="{ width: `${Math.min(tx.forecast.burnPercent, 100)}%` }"
             />
           </div>
         </div>
@@ -279,10 +331,10 @@ const healthExplanation = computed(() => {
         <ClientOnly>
           <p class="text-xs text-slate-500 leading-relaxed">
             At this rate you'll spend
-            <strong class="text-slate-700">{{ formatCurrency(forecast.projectedMonthTotal, auth.currency) }}</strong>
+            <strong class="text-slate-700">{{ formatCurrency(tx.forecast.projectedMonthTotal, auth.currency) }}</strong>
             this month
-            <span :class="forecast.burnLabel === 'over' ? 'text-red-500 font-semibold' : forecast.burnLabel === 'warning' ? 'text-amber-500 font-semibold' : 'text-emerald-600 font-semibold'">
-              — {{ forecast.burnLabel === 'over' ? 'over budget' : forecast.burnLabel === 'warning' ? 'watch spending' : 'on track' }}
+            <span :class="tx.forecast.burnLabel === 'over' ? 'text-red-500 font-semibold' : tx.forecast.burnLabel === 'warning' ? 'text-amber-500 font-semibold' : 'text-emerald-600 font-semibold'">
+              — {{ tx.forecast.burnLabel === 'over' ? 'over budget' : tx.forecast.burnLabel === 'warning' ? 'watch spending' : 'on track' }}
             </span>
           </p>
         </ClientOnly>
@@ -293,7 +345,7 @@ const healthExplanation = computed(() => {
     <div class="lg:grid lg:grid-cols-2 lg:gap-5 space-y-5 lg:space-y-0">
 
       <!-- Category Breakdown -->
-      <div v-if="tx.categoryBreakdown.length > 0" class="bg-white rounded-xl border border-slate-200 p-4">
+      <div v-if="tx.categoryBreakdown.length > 0" class="bg-white rounded-xl border border-slate-200 p-4 lg:col-span-1">
         <div class="flex items-center gap-2 mb-4">
           <UIcon name="i-lucide-pie-chart" class="text-violet-500 text-lg" />
           <h3 class="text-sm font-bold text-slate-800">Where Your Money Goes</h3>
@@ -317,8 +369,8 @@ const healthExplanation = computed(() => {
         </div>
       </div>
 
-      <!-- Recent Transactions -->
-      <div class="bg-white rounded-xl border border-slate-200 p-4">
+      <!-- Recent Transactions — spans both columns when categories card is hidden -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4" :class="tx.categoryBreakdown.length === 0 ? 'lg:col-span-2' : 'lg:col-span-1'">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
             <UIcon name="i-lucide-clock" class="text-slate-400 text-lg" />
@@ -389,7 +441,13 @@ const healthExplanation = computed(() => {
           <UIcon name="i-lucide-activity" class="text-blue-500 text-lg" />
           <h3 class="text-sm font-bold text-slate-800">This Week vs Last Week</h3>
         </div>
-        <div class="space-y-3">
+
+        <div v-if="!hasWeeklyData" class="py-4 text-center">
+          <UIcon name="i-lucide-activity" class="text-slate-300 text-2xl mb-1" />
+          <p class="text-xs text-slate-400">Add transactions to see weekly trends</p>
+        </div>
+
+        <div v-else class="space-y-3">
           <!-- Income comparison -->
           <div>
             <div class="flex items-center justify-between mb-1">
@@ -455,6 +513,79 @@ const healthExplanation = computed(() => {
         </div>
       </div>
 
+    </div>
+
+    <!-- Fourth row: Goals + Activity Heatmap -->
+    <div class="lg:grid lg:grid-cols-2 lg:gap-5 space-y-5 lg:space-y-0 mt-5">
+
+      <!-- Savings Goals Preview -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-target" class="text-emerald-500 text-lg" />
+            <h3 class="text-sm font-bold text-slate-800">Savings Goals</h3>
+          </div>
+          <NuxtLink to="/goals" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700">
+            {{ goalStore.goals.length > 0 ? 'View all' : 'Create one' }}
+          </NuxtLink>
+        </div>
+
+        <div v-if="goalStore.preview.length > 0" class="space-y-3">
+          <div
+            v-for="goal in goalStore.preview"
+            :key="goal.id"
+            class="flex items-center gap-3"
+          >
+            <!-- Mini progress ring -->
+            <div class="relative w-10 h-10 shrink-0">
+              <svg class="w-full h-full -rotate-90" viewBox="0 0 44 44">
+                <circle cx="22" cy="22" r="18" fill="none" stroke-width="3" class="stroke-slate-100" />
+                <circle
+                  cx="22" cy="22" r="18" fill="none" stroke-width="3" stroke-linecap="round"
+                  :stroke="(goalStore.progressMap[goal.id] ?? 0) >= 100 ? '#10b981' : goalDotColor(goal)"
+                  :stroke-dasharray="2 * Math.PI * 18"
+                  :stroke-dashoffset="ringOffset(goalStore.progressMap[goal.id] ?? 0, 18)"
+                  style="transition: stroke-dashoffset 0.5s ease-out"
+                />
+              </svg>
+              <div class="absolute inset-0 flex items-center justify-center">
+                <UIcon :name="goal.icon" class="text-sm" :class="goal.color" />
+              </div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs font-semibold text-slate-700 truncate">{{ goal.name }}</p>
+              <div class="h-1 bg-slate-100 rounded-full overflow-hidden mt-1">
+                <div class="h-full rounded-full" :style="{ width: `${goalStore.progressMap[goal.id]}%`, backgroundColor: goalDotColor(goal) }" />
+              </div>
+            </div>
+            <span class="text-xs font-bold text-slate-600 shrink-0">{{ goalStore.progressMap[goal.id] }}%</span>
+          </div>
+        </div>
+
+        <div v-else class="py-6 text-center">
+          <UIcon name="i-lucide-target" class="text-slate-300 text-2xl mb-1" />
+          <p class="text-xs text-slate-400">Set a savings target</p>
+          <NuxtLink to="/goals" class="text-xs font-semibold text-emerald-600 mt-1 inline-block">
+            Create a goal
+          </NuxtLink>
+        </div>
+      </div>
+
+      <!-- Activity Heatmap -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <div class="flex items-center gap-2 mb-4">
+          <UIcon name="i-lucide-calendar-days" class="text-green-600 text-lg" />
+          <h3 class="text-sm font-bold text-slate-800">Spending Activity</h3>
+        </div>
+        <p v-if="tx.transactions.length > 0" class="text-[13px] text-slate-500 leading-relaxed mb-3">
+          See which days you spend the most.
+        </p>
+        <ChartsActivityHeatmap v-if="tx.transactions.length > 0" :transactions="tx.transactions" :months="4" :currency="auth.currency" />
+        <div v-else class="py-6 text-center">
+          <UIcon name="i-lucide-calendar-days" class="text-slate-300 text-2xl mb-1" />
+          <p class="text-xs text-slate-400">Activity map appears after a few days of tracking</p>
+        </div>
+      </div>
     </div>
   </div>
 </template>

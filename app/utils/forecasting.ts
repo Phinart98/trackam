@@ -1,4 +1,5 @@
 import type { Transaction } from '~/types'
+import { getCurrencySymbol } from '~/utils/formatters'
 
 interface DailyBucket {
   date: string
@@ -69,8 +70,11 @@ export function calculateBurnRate(transactions: Transaction[], monthlyBudget: nu
   const monthPrefix = today.toISOString().slice(0, 7)
   const monthTxs = transactions.filter(t => t.date.startsWith(monthPrefix))
 
-  const totalExpenses = monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-  const totalIncome = monthTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+  let totalExpenses = 0, totalIncome = 0
+  for (const t of monthTxs) {
+    if (t.type === 'expense') totalExpenses += t.amount
+    else totalIncome += t.amount
+  }
 
   const dailyAverage = totalExpenses / Math.max(dayOfMonth, 1)
   const projectedMonthTotal = totalExpenses + dailyAverage * daysRemaining
@@ -107,8 +111,11 @@ export interface HealthScore {
 export function computeHealthScore(transactions: Transaction[], monthlyBudget: number): HealthScore {
   if (transactions.length === 0) return { score: 0, label: 'No data', color: 'text-slate-400' }
 
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+  let totalIncome = 0, totalExpenses = 0
+  for (const t of transactions) {
+    if (t.type === 'income') totalIncome += t.amount
+    else totalExpenses += t.amount
+  }
 
   // Factor 1: Income/Expense ratio (35%) — 100 if income ≥ 2× expenses
   const ratio = totalExpenses > 0 ? totalIncome / totalExpenses : 2
@@ -256,7 +263,7 @@ export function detectAnomalies(transactions: Transaction[], currency: string): 
     if (monthlySavings > 5) {
       const catName = topCat.charAt(0).toUpperCase() + topCat.slice(1).replace('_', ' ')
       alerts.push({
-        message: `Reducing ${catName} by 10% could save ~${currency} ${monthlySavings}/month`,
+        message: `Reducing ${catName} by 10% could save ~${getCurrencySymbol(currency)} ${monthlySavings}/month`,
         icon: 'i-lucide-piggy-bank',
         color: 'text-blue-600',
         bgColor: 'bg-blue-50'

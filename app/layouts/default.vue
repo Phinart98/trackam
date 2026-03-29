@@ -1,18 +1,24 @@
 <script setup lang="ts">
 const auth = useAuthStore()
 const tx = useTransactionStore()
-const router = useRouter()
+const catStore = useCategoryStore()
 
-// Seed synchronously so data is available on the first render
-if (auth.isLoggedIn) {
-  tx.seed()
-}
+// Await init so session state is resolved before checking isLoggedIn
+await auth.init()
 
-onMounted(() => {
-  if (!auth.isLoggedIn) {
-    router.replace('/')
+// Load data once when login state becomes true — watch prevents duplicate calls on token refresh
+watch(() => auth.isLoggedIn, (loggedIn) => {
+  if (loggedIn) {
+    const config = useRuntimeConfig()
+    const apiBase = config.public.apiBaseUrl as string
+    if (apiBase) {
+      tx.fetchFromApi(apiBase)
+      catStore.fetchFromApi()
+    } else {
+      tx.loadTransactions()
+    }
   }
-})
+}, { immediate: true })
 </script>
 
 <template>
@@ -32,5 +38,7 @@ onMounted(() => {
 
     <!-- Mobile bottom nav -->
     <LayoutBottomNav />
+
+    <ConfirmDialog />
   </div>
 </template>

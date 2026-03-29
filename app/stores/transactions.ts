@@ -1,23 +1,28 @@
 import { defineStore } from 'pinia'
 import type { Transaction } from '~/types'
-import { getCategoryById } from '~/utils/categories'
-import { generateMockTransactions } from '~/utils/mockDataGenerator'
 import { calculateBurnRate, trendDirection } from '~/utils/forecasting'
 
 export type ChartRange = '1W' | '1M' | '3M' | '6M'
 
+const sumByType = (txs: { type: string; amount: number }[], type: 'income' | 'expense') =>
+  txs.filter(t => t.type === type).reduce((s, t) => s + t.amount, 0)
+
+
 export const useTransactionStore = defineStore('transactions', {
   state: () => ({
     transactions: [] as Transaction[],
-    seeded: false,
     chartRange: '1M' as ChartRange,
+    loading: false,
+    aiInsight: null as string | null,
+    aiInsightAt: 0,       // unix timestamp ms when last generated
+    aiInsightTxCount: 0,  // transaction count when last generated
   }),
 
   getters: {
     sorted: state => [...state.transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
 
-    totalIncome: state => state.transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
-    totalExpenses: state => state.transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0),
+    totalIncome: state => sumByType(state.transactions, 'income'),
+    totalExpenses: state => sumByType(state.transactions, 'expense'),
     balance(): number { return this.totalIncome - this.totalExpenses },
 
     recentTransactions(): Transaction[] {
@@ -30,25 +35,23 @@ export const useTransactionStore = defineStore('transactions', {
       const grouped: Record<string, number> = {}
       expenses.forEach(t => { grouped[t.category] = (grouped[t.category] ?? 0) + t.amount })
 
+      const catStore = useCategoryStore()
       return Object.entries(grouped)
         .map(([id, amount]) => {
-          const cat = getCategoryById(id)
-          // Derive a solid dot color from bgColor class (bg-orange-100 → #f97316 etc.)
-          const dotColor = DOT_COLOR_MAP[id] ?? '#94a3b8'
+          const cat = catStore.byId(id)
           return {
             categoryId: id,
             name: cat?.name ?? id,
             amount,
             color: cat?.color ?? 'text-slate-400',
             bgColor: cat?.bgColor ?? 'bg-slate-100',
-            dotColor,
-            percentage: total > 0 ? Math.round((amount / total) * 100) : 0,
+            dotColor: cat?.dotColor ?? '#94a3b8',
+            percentage: total > 0 ? Math.round((amount / total) * 100) : 0
           }
         })
         .sort((a, b) => b.amount - a.amount)
     },
 
-    // Replaces weeklyData — builds chart data based on chartRange
     chartData(): { labels: string[]; income: number[]; expenses: number[] } {
       const range = this.chartRange
       const labels: string[] = []
@@ -57,58 +60,42 @@ export const useTransactionStore = defineStore('transactions', {
       const now = new Date()
 
       if (range === '1W') {
-        // 7 daily bars
         for (let i = 6; i >= 0; i--) {
           const d = new Date(now)
           d.setDate(d.getDate() - i)
           const iso = d.toISOString().slice(0, 10)
           labels.push(d.toLocaleDateString('en-GB', { weekday: 'short' }))
           const dayTxs = this.transactions.filter(t => t.date.startsWith(iso))
-          income.push(dayTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0))
-          expenses.push(dayTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0))
+          income.push(sumByType(dayTxs, 'income'))
+          expenses.push(sumByType(dayTxs, 'expense'))
         }
-      } else if (range === '1M') {
-        // 4-5 weekly bars
-        for (let i = 3; i >= 0; i--) {
+      } else if (range === '1M' || range === '3M') {
+        const weeks = range === '1M' ? 4 : 12
+        for (let i = weeks - 1; i >= 0; i--) {
           const weekEnd = new Date(now)
           weekEnd.setDate(weekEnd.getDate() - i * 7)
+          // Include end date (add 1 day so today's transactions are not excluded)
+          const weekEndInclusive = new Date(weekEnd)
+          weekEndInclusive.setDate(weekEndInclusive.getDate() + 1)
           const weekStart = new Date(weekEnd)
           weekStart.setDate(weekStart.getDate() - 7)
-          const label = weekStart.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
-          labels.push(label)
+          labels.push(weekStart.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }))
           const txs = this.transactions.filter(t => {
             const d = new Date(t.date)
-            return d >= weekStart && d < weekEnd
+            return d >= weekStart && d < weekEndInclusive
           })
-          income.push(txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0))
-          expenses.push(txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0))
-        }
-      } else if (range === '3M') {
-        // ~12 weekly bars
-        for (let i = 11; i >= 0; i--) {
-          const weekEnd = new Date(now)
-          weekEnd.setDate(weekEnd.getDate() - i * 7)
-          const weekStart = new Date(weekEnd)
-          weekStart.setDate(weekStart.getDate() - 7)
-          const label = weekStart.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
-          labels.push(label)
-          const txs = this.transactions.filter(t => {
-            const d = new Date(t.date)
-            return d >= weekStart && d < weekEnd
-          })
-          income.push(txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0))
-          expenses.push(txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0))
+          income.push(sumByType(txs, 'income'))
+          expenses.push(sumByType(txs, 'expense'))
         }
       } else {
-        // 6M — 6 monthly bars
         for (let i = 5; i >= 0; i--) {
           const d = new Date(now)
           d.setMonth(d.getMonth() - i)
           const prefix = d.toISOString().slice(0, 7)
           labels.push(d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }))
           const txs = this.transactions.filter(t => t.date.startsWith(prefix))
-          income.push(txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0))
-          expenses.push(txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0))
+          income.push(sumByType(txs, 'income'))
+          expenses.push(sumByType(txs, 'expense'))
         }
       }
 
@@ -116,24 +103,84 @@ export const useTransactionStore = defineStore('transactions', {
     },
 
     forecast(): ReturnType<typeof calculateBurnRate> & { trend: string } {
-      const budget = 0 // will be overridden by component using auth store
+      const budget = useAuthStore().profile?.monthlyBudget ?? 0
       const result = calculateBurnRate(this.transactions, budget)
       const trend = trendDirection(this.transactions)
       return { ...result, trend }
     },
 
-    weeklyData(): { labels: string[]; income: number[]; expenses: number[] } {
-      // Keep for backwards compat — mirrors 1M chart data
-      return this.chartData
-    },
   },
 
   actions: {
-    seed() {
-      if (!this.seeded) {
-        this.transactions = generateMockTransactions(2)
-        this.seeded = true
+    async loadTransactions() {
+      const config = useRuntimeConfig()
+      const apiBaseUrl = config.public.apiBaseUrl as string
+      if (apiBaseUrl) await this.fetchFromApi(apiBaseUrl)
+    },
+
+    /** Fetch all transactions from the backend API. */
+    async fetchFromApi(apiBaseUrl: string) {
+      this.loading = true
+      try {
+        const token = await getAuthToken()
+        const data = await $fetch<Transaction[]>(`${apiBaseUrl}/api/transactions`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        })
+        this.transactions = data
+      } catch (err) {
+        if ((err as any)?.statusCode === 401) { await useAuthStore().logout(); await navigateTo('/login'); return }
+        console.warn('Failed to fetch transactions from API:', err)
+      } finally {
+        this.loading = false
       }
+    },
+
+    /** Save a transaction — to API if available, always to local store. */
+    async saveTransaction(tx: Omit<Transaction, 'id'>) {
+      const config = useRuntimeConfig()
+      const apiBaseUrl = config.public.apiBaseUrl as string
+
+      if (apiBaseUrl) {
+        try {
+          const token = await getAuthToken()
+          const saved = await $fetch<Transaction>(`${apiBaseUrl}/api/transactions`, {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: tx
+          })
+          this.transactions.unshift(saved)
+          return
+        } catch (err) {
+          console.warn('Failed to save to API, saving locally:', err)
+        }
+      }
+
+      // Fallback: save locally
+      this.addTransaction(tx)
+    },
+
+    /** Delete a transaction — from API if available, always from local store. */
+    async removeTransaction(id: string) {
+      const config = useRuntimeConfig()
+      const apiBaseUrl = config.public.apiBaseUrl as string
+
+      if (apiBaseUrl) {
+        try {
+          const token = await getAuthToken()
+          await $fetch(`${apiBaseUrl}/api/transactions/${id}`, {
+            method: 'DELETE',
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          })
+        } catch (err: any) {
+          // Only remove locally if API returned 404 (already deleted)
+          if (err?.statusCode !== 404) {
+            console.warn('Failed to delete from API:', err)
+            return
+          }
+        }
+      }
+
+      this.transactions = this.transactions.filter(t => t.id !== id)
     },
 
     setChartRange(range: ChartRange) {
@@ -143,30 +190,10 @@ export const useTransactionStore = defineStore('transactions', {
     addTransaction(tx: Omit<Transaction, 'id'>) {
       this.transactions.unshift({ ...tx, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` })
     },
-
-    deleteTransaction(id: string) {
-      this.transactions = this.transactions.filter(t => t.id !== id)
-    },
   },
 
-  persist: true,
+  persist: {
+    pick: ['transactions', 'chartRange', 'aiInsight', 'aiInsightAt', 'aiInsightTxCount']
+  }
 })
 
-// Solid hex colors for category doughnut dots
-const DOT_COLOR_MAP: Record<string, string> = {
-  food: '#f97316',
-  transport: '#eab308',
-  market: '#ec4899',
-  airtime: '#ef4444',
-  bills: '#16a34a',
-  health: '#3b82f6',
-  education: '#6366f1',
-  supplies: '#b45309',
-  personal: '#a855f7',
-  gifts: '#14b8a6',
-  other_expense: '#94a3b8',
-  sales: '#10b981',
-  momo: '#ca8a04',
-  salary: '#7c3aed',
-  other_income: '#65a30d',
-}

@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import type { Ref } from 'vue'
 import type { ParsedTransaction } from '~/types'
-import { getExpenseCategories, getIncomeCategories, getCategoryById } from '~/utils/categories'
-import { formatCurrency } from '~/utils/formatters'
+import { formatCurrency, getCurrencySymbol } from '~/utils/formatters'
 
 const auth = useAuthStore()
 const tx = useTransactionStore()
+const catStore = useCategoryStore()
 const { parseText, parseImage } = useAI()
 const toast = useToast()
 const route = useRoute()
@@ -16,29 +17,38 @@ onMounted(() => {
   if (route.query.tab === 'scan') activeTab.value = 'scan'
 })
 
+// Shared confidence count-up animation — returns interval ID for cleanup
+function startConfidenceAnimation(target: number, counter: Ref<number>): ReturnType<typeof setInterval> {
+  counter.value = 0
+  const step = target / 30
+  const id = setInterval(() => {
+    counter.value = Math.min(Math.round(counter.value + step), target)
+    if (counter.value >= target) clearInterval(id)
+  }, 20)
+  return id
+}
+
 // --- Text tab ---
 const textInput = ref('')
 const isParsing = ref(false)
 const parsedResult = ref<ParsedTransaction | null>(null)
 const displayedConfidence = ref(0)
+let textConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
 async function handleParseText() {
   if (!textInput.value.trim()) return
   isParsing.value = true
   parsedResult.value = null
-
-  const result = await parseText(textInput.value)
-  parsedResult.value = result
-  isParsing.value = false
-
-  // Animate confidence count-up
-  displayedConfidence.value = 0
-  const target = result.confidence
-  const step = target / 30
-  const interval = setInterval(() => {
-    displayedConfidence.value = Math.min(Math.round(displayedConfidence.value + step), target)
-    if (displayedConfidence.value >= target) clearInterval(interval)
-  }, 20)
+  try {
+    const result = await parseText(textInput.value)
+    parsedResult.value = result
+    if (textConfidenceTimer) clearInterval(textConfidenceTimer)
+    textConfidenceTimer = startConfidenceAnimation(result.confidence, displayedConfidence)
+  } catch {
+    toast.add({ title: 'Parse failed', description: 'Could not read transaction. Try again.', color: 'error' })
+  } finally {
+    isParsing.value = false
+  }
 }
 
 // --- Scan tab ---
@@ -48,29 +58,36 @@ const previewUrl = ref<string | null>(null)
 const isScanning = ref(false)
 const scanResult = ref<ParsedTransaction | null>(null)
 const scanConfidence = ref(0)
+let scanConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
 function handleFileSelect(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
   selectedFile.value = file
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
   previewUrl.value = URL.createObjectURL(file)
   handleScan(file)
 }
 
+onUnmounted(() => {
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  if (textConfidenceTimer) clearInterval(textConfidenceTimer)
+  if (scanConfidenceTimer) clearInterval(scanConfidenceTimer)
+})
+
 async function handleScan(file: File) {
   isScanning.value = true
   scanResult.value = null
-  const result = await parseImage(file)
-  scanResult.value = result
-  isScanning.value = false
-
-  scanConfidence.value = 0
-  const target = result.confidence
-  const step = target / 30
-  const interval = setInterval(() => {
-    scanConfidence.value = Math.min(Math.round(scanConfidence.value + step), target)
-    if (scanConfidence.value >= target) clearInterval(interval)
-  }, 20)
+  try {
+    const result = await parseImage(file)
+    scanResult.value = result
+    if (scanConfidenceTimer) clearInterval(scanConfidenceTimer)
+    scanConfidenceTimer = startConfidenceAnimation(result.confidence, scanConfidence)
+  } catch {
+    toast.add({ title: 'Scan failed', description: 'Could not read the image. Try again or enter manually.', color: 'error' })
+  } finally {
+    isScanning.value = false
+  }
 }
 
 // --- Manual tab ---
@@ -78,14 +95,14 @@ const manualType = ref<'income' | 'expense'>('expense')
 const manualAmount = ref('')
 const manualCategory = ref('')
 const manualDescription = ref('')
-const manualDate = ref(new Date().toISOString().split('T')[0])
+const manualDate = ref(new Date().toISOString().slice(0, 10))
 const manualCategories = computed(() =>
-  manualType.value === 'income' ? getIncomeCategories() : getExpenseCategories()
+  manualType.value === 'income' ? catStore.incomeCategories : catStore.expenses
 )
 
 // --- Save helpers ---
-function saveTransaction(result: ParsedTransaction, source: 'ai-text' | 'ai-image' | 'manual') {
-  tx.addTransaction({
+async function saveTransaction(result: ParsedTransaction, source: 'ai-text' | 'ai-image' | 'manual') {
+  await tx.saveTransaction({
     type: result.type,
     amount: result.amount,
     currency: auth.currency,
@@ -100,20 +117,23 @@ function saveTransaction(result: ParsedTransaction, source: 'ai-text' | 'ai-imag
   navigateTo('/dashboard')
 }
 
-function saveManual() {
-  if (!manualAmount.value || !manualCategory.value || !manualDescription.value) return
-  tx.addTransaction({
+async function saveManual() {
+  const amount = parseFloat(manualAmount.value)
+  if (!manualCategory.value || !manualDescription.value || !isFinite(amount) || amount <= 0) return
+  await tx.saveTransaction({
     type: manualType.value,
-    amount: parseFloat(manualAmount.value),
+    amount,
     currency: auth.currency,
     category: manualCategory.value,
     description: manualDescription.value,
-    date: new Date(manualDate.value).toISOString(),
+    date: manualDate.value,
     source: 'manual'
   })
   toast.add({ title: 'Transaction saved', color: 'success' })
   navigateTo('/dashboard')
 }
+
+const today = new Date().toISOString().slice(0, 10)
 
 const confidenceColor = (score: number) =>
   score >= 90 ? 'text-green-600' : score >= 80 ? 'text-yellow-600' : 'text-red-500'
@@ -199,7 +219,7 @@ const confidenceBg = (score: number) =>
             {{ parsedResult.type }}
           </span>
           <span class="text-xs text-slate-400 capitalize">
-            {{ getCategoryById(parsedResult.category)?.name ?? parsedResult.category }}
+            {{ catStore.byId(parsedResult.category)?.name ?? parsedResult.category }}
           </span>
         </div>
 
@@ -266,6 +286,16 @@ const confidenceBg = (score: number) =>
           </span>
         </div>
 
+        <!-- FX conversion indicator -->
+        <div v-if="scanResult.originalCurrency && scanResult.originalAmount" class="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
+          <UIcon name="i-lucide-arrow-right-left" class="text-blue-500 text-sm shrink-0" />
+          <span class="text-xs text-blue-700">
+            {{ formatCurrency(scanResult.originalAmount!, scanResult.originalCurrency) }}
+            → {{ formatCurrency(scanResult.amount, auth.currency) }}
+            <span class="text-blue-400 ml-1">@ {{ scanResult.exchangeRate?.toFixed(4) }}</span>
+          </span>
+        </div>
+
         <div>
           <div class="flex items-center justify-between mb-1">
             <span class="text-xs text-slate-500">AI Confidence</span>
@@ -319,7 +349,7 @@ const confidenceBg = (score: number) =>
         <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2">Amount</label>
         <div class="relative">
           <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">
-            {{ auth.currency === 'GHS' ? 'GH₵' : auth.currency }}
+            {{ getCurrencySymbol(auth.currency) }}
           </span>
           <input
             v-model="manualAmount"
@@ -370,7 +400,7 @@ const confidenceBg = (score: number) =>
         <input
           v-model="manualDate"
           type="date"
-          :max="new Date().toISOString().slice(0, 10)"
+          :max="today"
           class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-800 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
         >
       </div>

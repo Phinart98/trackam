@@ -1,53 +1,58 @@
 <script setup lang="ts">
+import { SUPPORTED_CURRENCIES } from '~/utils/formatters'
+import { BUSINESS_TYPES } from '~/utils/categories'
+
 definePageMeta({ layout: 'auth' })
 
 const auth = useAuthStore()
-const router = useRouter()
-
-onMounted(() => {
-  if (!auth.isLoggedIn) router.replace('/')
-  if (auth.profile?.onboarded) router.replace('/dashboard')
-})
 
 const step = ref(1)
 const selectedCurrency = ref('GHS')
 const selectedBusinessType = ref('')
+const customBusinessName = ref('')
 const monthlyBudget = ref('')
 
-const currencies = [
-  { code: 'GHS', label: 'Ghanaian Cedi', symbol: 'GH₵', flag: '🇬🇭' },
-  { code: 'NGN', label: 'Nigerian Naira', symbol: '₦', flag: '🇳🇬' },
-  { code: 'KES', label: 'Kenyan Shilling', symbol: 'KSh', flag: '🇰🇪' },
-  { code: 'UGX', label: 'Ugandan Shilling', symbol: 'USh', flag: '🇺🇬' },
-  { code: 'ZAR', label: 'South African Rand', symbol: 'R', flag: '🇿🇦' },
-  { code: 'TZS', label: 'Tanzanian Shilling', symbol: 'TSh', flag: '🇹🇿' },
-  { code: 'USD', label: 'US Dollar', symbol: '$', flag: '🇺🇸' },
-  { code: 'EUR', label: 'Euro', symbol: '€', flag: '🇪🇺' }
-]
+const resolvedBusinessType = computed(() =>
+  selectedBusinessType.value === 'other' && customBusinessName.value.trim()
+    ? customBusinessName.value.trim()
+    : selectedBusinessType.value
+)
 
-const businessTypes = [
-  { id: 'market_trader', label: 'Market Trader', icon: 'i-lucide-store' },
-  { id: 'food_vendor', label: 'Food Vendor', icon: 'i-lucide-chef-hat' },
-  { id: 'tailor', label: 'Tailor/Seamstress', icon: 'i-lucide-scissors' },
-  { id: 'transport', label: 'Transport', icon: 'i-lucide-bus' },
-  { id: 'salon', label: 'Salon/Barber', icon: 'i-lucide-sparkles' },
-  { id: 'retail', label: 'General Retail', icon: 'i-lucide-shopping-bag' },
-  { id: 'freelancer', label: 'Freelancer', icon: 'i-lucide-laptop' },
-  { id: 'other', label: 'Other', icon: 'i-lucide-briefcase' }
-]
-
-function finish() {
+async function finish() {
   auth.completeOnboarding(
     selectedCurrency.value,
-    selectedBusinessType.value,
+    resolvedBusinessType.value,
     monthlyBudget.value ? parseFloat(monthlyBudget.value) : undefined
   )
+
+  // Sync profile to backend if available
+  const config = useRuntimeConfig()
+  const apiBaseUrl = config.public.apiBaseUrl as string
+  if (apiBaseUrl) {
+    try {
+      const token = await getAuthToken()
+      const budget = monthlyBudget.value ? parseFloat(monthlyBudget.value) : undefined
+      await $fetch(`${apiBaseUrl}/api/profile`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: {
+          name: auth.profile?.name,
+          currency: selectedCurrency.value,
+          businessType: resolvedBusinessType.value,
+          monthlyBudget: budget
+        }
+      })
+    } catch (err) {
+      console.warn('Failed to sync profile to backend:', err)
+    }
+  }
+
   navigateTo('/dashboard')
 }
 </script>
 
 <template>
-  <div class="max-w-xl mx-auto w-full">
+  <div class="max-w-xl mx-auto w-full px-5 py-8 lg:py-12">
     <!-- Progress bar -->
     <div class="flex gap-2 mb-8">
       <div v-for="i in 3" :key="i" class="flex-1 h-1 rounded-full transition-all duration-500" :class="i <= step ? 'bg-emerald-500' : 'bg-slate-200'" />
@@ -60,20 +65,20 @@ function finish() {
       </h1>
       <p class="text-sm text-slate-500 mb-6">Which currency do you mainly trade in?</p>
 
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-8">
+      <div class="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-8 max-h-80 overflow-y-auto pr-1">
         <button
-          v-for="c in currencies"
+          v-for="c in SUPPORTED_CURRENCIES"
           :key="c.code"
-          class="flex items-center gap-3 p-3 rounded-xl border-2 transition-all active:scale-[0.97] text-left"
+          class="flex items-center gap-2 p-2.5 rounded-xl border-2 transition-all active:scale-[0.97] text-left"
           :class="selectedCurrency === c.code
             ? 'border-emerald-500 bg-emerald-50'
             : 'border-slate-200 bg-white hover:border-slate-300'"
           @click="selectedCurrency = c.code"
         >
-          <span class="text-2xl">{{ c.flag }}</span>
-          <div class="max-w-xl mx-auto w-full">
-            <p class="text-sm font-bold text-slate-800">{{ c.symbol }}</p>
-            <p class="text-xs text-slate-400 leading-tight">{{ c.label }}</p>
+          <span class="text-xl">{{ c.flag }}</span>
+          <div class="min-w-0">
+            <p class="text-sm font-bold text-slate-800">{{ c.code }}</p>
+            <p class="text-[10px] text-slate-400 leading-tight truncate">{{ c.symbol }}</p>
           </div>
         </button>
       </div>
@@ -94,15 +99,15 @@ function finish() {
       </h1>
       <p class="text-sm text-slate-500 mb-6">What type of business do you run?</p>
 
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-8">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         <button
-          v-for="b in businessTypes"
-          :key="b.id"
+          v-for="b in BUSINESS_TYPES"
+          :key="b.value"
           class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all active:scale-[0.97]"
-          :class="selectedBusinessType === b.id
+          :class="selectedBusinessType === b.value
             ? 'border-emerald-500 bg-emerald-50'
             : 'border-slate-200 bg-white hover:border-slate-300'"
-          @click="selectedBusinessType = b.id"
+          @click="selectedBusinessType = b.value"
         >
           <span class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
             <UIcon :name="b.icon" class="text-slate-600 text-xl" />
@@ -111,7 +116,27 @@ function finish() {
         </button>
       </div>
 
-      <div class="flex gap-3">
+      <!-- Custom business name when "Other" is selected -->
+      <Transition
+        enter-active-class="transition-all duration-200 ease-out"
+        enter-from-class="opacity-0 -translate-y-2"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition-all duration-150 ease-in"
+        leave-from-class="opacity-100 translate-y-0"
+        leave-to-class="opacity-0 -translate-y-2"
+      >
+        <div v-if="selectedBusinessType === 'other'" class="mb-4">
+          <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">What do you do?</label>
+          <input
+            v-model="customBusinessName"
+            type="text"
+            placeholder="e.g. Bakery, Mechanic, Photography"
+            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
+          >
+        </div>
+      </Transition>
+
+      <div class="flex gap-3 mt-4">
         <button
           class="flex-1 py-4 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold text-[15px] active:scale-[0.98] transition-all"
           @click="step = 1"
@@ -119,7 +144,7 @@ function finish() {
           Back
         </button>
         <button
-          :disabled="!selectedBusinessType"
+          :disabled="!selectedBusinessType || (selectedBusinessType === 'other' && !customBusinessName.trim())"
           class="flex-[2] py-4 rounded-2xl bg-emerald-500 text-white font-bold text-[15px] shadow-lg shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           @click="step = 3"
         >
@@ -138,7 +163,7 @@ function finish() {
 
       <div class="relative mb-8">
         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">
-          {{ currencies.find(c => c.code === selectedCurrency)?.symbol }}
+          {{ SUPPORTED_CURRENCIES.find(c => c.code === selectedCurrency)?.symbol }}
         </span>
         <input
           v-model="monthlyBudget"
