@@ -20,7 +20,8 @@ Thumbs.db
 .fleet
 .idea
 
-# Claude Code plan files (sometimes land in project dir)
+# Claude Code files
+CLAUDE.md
 UsersPhilip*.md
 
 # Local env files
