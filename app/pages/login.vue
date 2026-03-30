@@ -10,6 +10,7 @@ const email = ref('')
 const password = ref('')
 const name = ref('')
 const loading = ref(false)
+const confirmEmailSent = ref(false)
 
 const isSignIn = computed(() => tab.value === 'signin')
 
@@ -28,6 +29,10 @@ async function submit() {
       router.push('/dashboard')
     }
   } catch (err: unknown) {
+    if ((err as { code?: string })?.code === 'confirm_email') {
+      confirmEmailSent.value = true
+      return
+    }
     const message = err instanceof Error ? err.message : 'Something went wrong'
     toast.add({ title: message, color: 'error' })
   } finally {
@@ -149,8 +154,23 @@ onUnmounted(() => clearInterval(intervalId))
           </button>
         </div>
 
+        <!-- Email confirmation screen -->
+        <div v-if="confirmEmailSent" class="text-center py-6">
+          <div class="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+            <UIcon name="i-lucide-mail-check" class="text-emerald-600 text-3xl" />
+          </div>
+          <h3 class="text-xl font-bold text-slate-800 mb-2">Check your email</h3>
+          <p class="text-slate-500 text-sm leading-relaxed">
+            We sent a confirmation link to <strong>{{ email }}</strong>.<br>
+            Click the link to activate your account.
+          </p>
+          <button class="mt-6 text-sm text-emerald-600 font-semibold hover:underline" @click="confirmEmailSent = false">
+            Use a different email
+          </button>
+        </div>
+
         <!-- Form -->
-        <form class="flex flex-col gap-4" @submit.prevent="submit">
+        <form v-else class="flex flex-col gap-4" @submit.prevent="submit">
           <div v-if="!isSignIn">
             <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Full Name</label>
             <UInput

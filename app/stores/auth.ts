@@ -133,7 +133,7 @@ export const useAuthStore = defineStore('auth', {
       }
 
       const supabase = useSupabase()
-      const { error } = await supabase.auth.signUp({
+      const { error, data } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -144,6 +144,12 @@ export const useAuthStore = defineStore('auth', {
       if (error) {
         this.authError = error.message
         throw new Error(error.message)
+      }
+
+      // Supabase returns session=null when email confirmation is required.
+      // Never log the user in until they've verified their email.
+      if (!data.session) {
+        throw Object.assign(new Error('confirm_email'), { code: 'confirm_email' })
       }
 
       this.isLoggedIn = true
