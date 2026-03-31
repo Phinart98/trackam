@@ -27,7 +27,7 @@ function resetForm() {
   showForm.value = false
 }
 
-function startEdit(cat: { id: string; name: string; icon: string; dotColor: string; type: 'income' | 'expense'; keywords?: string[] }) {
+function startEdit(cat: { id: string, name: string, icon: string, dotColor: string, type: 'income' | 'expense', keywords?: string[] }) {
   editingId.value = cat.id
   formName.value = cat.name
   formType.value = cat.type
@@ -53,7 +53,7 @@ function handleSave() {
     bgColor: formColor.value.bgColor,
     dotColor: formColor.value.dotColor,
     type: formType.value,
-    keywords: keywords.length ? keywords : undefined,
+    keywords: keywords.length ? keywords : undefined
   }
 
   if (isEditing.value) {
@@ -85,15 +85,22 @@ const customIncome = computed(() => catStore.custom.filter(c => c.type === 'inco
     <!-- Header -->
     <div class="flex items-center justify-between mb-5">
       <div>
-        <h1 class="text-xl font-bold text-slate-900 font-display lg:text-2xl">Categories</h1>
-        <p class="text-sm text-slate-400 mt-0.5">Customize how your transactions are organized</p>
+        <h1 class="text-xl font-bold text-slate-900 font-display lg:text-2xl">
+          Categories
+        </h1>
+        <p class="text-sm text-slate-400 mt-0.5">
+          Customize how your transactions are organized
+        </p>
       </div>
       <button
         v-if="!showForm"
         class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500 text-white font-semibold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.97] transition-all"
         @click="showForm = true"
       >
-        <UIcon name="i-lucide-plus" class="text-base" />
+        <UIcon
+          name="i-lucide-plus"
+          class="text-base"
+        />
         Add
       </button>
     </div>
@@ -107,13 +114,22 @@ const customIncome = computed(() => catStore.custom.filter(c => c.type === 'inco
       leave-from-class="opacity-100 translate-y-0"
       leave-to-class="opacity-0 -translate-y-2"
     >
-      <div v-if="showForm" class="bg-white rounded-xl border border-slate-200 p-4 mb-5 space-y-4">
+      <div
+        v-if="showForm"
+        class="bg-white rounded-xl border border-slate-200 p-4 mb-5 space-y-4"
+      >
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-bold text-slate-800">
             {{ isEditing ? 'Edit Category' : 'New Category' }}
           </h2>
-          <button class="text-slate-400 hover:text-slate-600" @click="resetForm">
-            <UIcon name="i-lucide-x" class="text-lg" />
+          <button
+            class="text-slate-400 hover:text-slate-600"
+            @click="resetForm"
+          >
+            <UIcon
+              name="i-lucide-x"
+              class="text-lg"
+            />
           </button>
         </div>
 
@@ -206,18 +222,32 @@ const customIncome = computed(() => catStore.custom.filter(c => c.type === 'inco
 
         <!-- Preview + Save -->
         <div class="flex items-center gap-3">
-          <div v-if="formName.trim()" class="flex items-center gap-2 flex-1 min-w-0">
-            <span class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0" :class="formColor.bgColor">
-              <UIcon :name="formIcon" class="text-base" :class="formColor.color" />
+          <div
+            v-if="formName.trim()"
+            class="flex items-center gap-2 flex-1 min-w-0"
+          >
+            <span
+              class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
+              :class="formColor.bgColor"
+            >
+              <UIcon
+                :name="formIcon"
+                class="text-base"
+                :class="formColor.color"
+              />
             </span>
             <span class="text-sm font-semibold text-slate-700 truncate">{{ formName.trim() }}</span>
-            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+            <span
+              class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
               :class="formType === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
             >
               {{ formType }}
             </span>
           </div>
-          <div v-else class="flex-1" />
+          <div
+            v-else
+            class="flex-1"
+          />
           <button
             :disabled="!formName.trim()"
             class="px-5 py-2.5 rounded-xl bg-emerald-500 text-white font-semibold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -231,7 +261,9 @@ const customIncome = computed(() => catStore.custom.filter(c => c.type === 'inco
 
     <!-- Expense Categories (defaults + custom, unified) -->
     <div class="mb-5">
-      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1 mb-2">Expense Categories</p>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1 mb-2">
+        Expense Categories
+      </p>
       <div class="bg-white rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-50">
         <div
           v-for="cat in [...allDefaultExpenses, ...customExpenses]"
@@ -239,21 +271,49 @@ const customIncome = computed(() => catStore.custom.filter(c => c.type === 'inco
           class="flex items-center gap-3 px-4 py-2.5 transition-opacity"
           :class="catStore.isHidden(cat.id) ? 'opacity-40' : ''"
         >
-          <span class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0" :class="cat.bgColor">
-            <UIcon :name="cat.icon" class="text-sm" :class="cat.color" />
+          <span
+            class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
+            :class="cat.bgColor"
+          >
+            <UIcon
+              :name="cat.icon"
+              class="text-sm"
+              :class="cat.color"
+            />
           </span>
           <div class="flex-1 min-w-0">
             <span class="text-sm font-medium text-slate-700 truncate block">{{ cat.name }}</span>
-            <span v-if="!cat.isDefault && cat.keywords?.length" class="text-[11px] text-slate-400 truncate block">
+            <span
+              v-if="!cat.isDefault && cat.keywords?.length"
+              class="text-[11px] text-slate-400 truncate block"
+            >
               {{ cat.keywords.join(', ') }}
             </span>
           </div>
           <!-- Edit/delete for custom categories -->
-          <button v-if="!cat.isDefault" class="text-slate-400 hover:text-slate-600 p-1" :aria-label="`Edit ${cat.name}`" @click="startEdit(cat)">
-            <UIcon name="i-lucide-pencil" class="text-sm" aria-hidden="true" />
+          <button
+            v-if="!cat.isDefault"
+            class="text-slate-400 hover:text-slate-600 p-1"
+            :aria-label="`Edit ${cat.name}`"
+            @click="startEdit(cat)"
+          >
+            <UIcon
+              name="i-lucide-pencil"
+              class="text-sm"
+              aria-hidden="true"
+            />
           </button>
-          <button v-if="!cat.isDefault" class="text-slate-400 hover:text-red-500 p-1" :aria-label="`Delete ${cat.name}`" @click="handleDelete(cat.id)">
-            <UIcon name="i-lucide-trash-2" class="text-sm" aria-hidden="true" />
+          <button
+            v-if="!cat.isDefault"
+            class="text-slate-400 hover:text-red-500 p-1"
+            :aria-label="`Delete ${cat.name}`"
+            @click="handleDelete(cat.id)"
+          >
+            <UIcon
+              name="i-lucide-trash-2"
+              class="text-sm"
+              aria-hidden="true"
+            />
           </button>
           <!-- Toggle switch for ALL categories -->
           <button
@@ -273,7 +333,9 @@ const customIncome = computed(() => catStore.custom.filter(c => c.type === 'inco
 
     <!-- Income Categories (defaults + custom, unified) -->
     <div class="mb-5">
-      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1 mb-2">Income Categories</p>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1 mb-2">
+        Income Categories
+      </p>
       <div class="bg-white rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-50">
         <div
           v-for="cat in [...allDefaultIncome, ...customIncome]"
@@ -281,21 +343,49 @@ const customIncome = computed(() => catStore.custom.filter(c => c.type === 'inco
           class="flex items-center gap-3 px-4 py-2.5 transition-opacity"
           :class="catStore.isHidden(cat.id) ? 'opacity-40' : ''"
         >
-          <span class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0" :class="cat.bgColor">
-            <UIcon :name="cat.icon" class="text-sm" :class="cat.color" />
+          <span
+            class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
+            :class="cat.bgColor"
+          >
+            <UIcon
+              :name="cat.icon"
+              class="text-sm"
+              :class="cat.color"
+            />
           </span>
           <div class="flex-1 min-w-0">
             <span class="text-sm font-medium text-slate-700 truncate block">{{ cat.name }}</span>
-            <span v-if="!cat.isDefault && cat.keywords?.length" class="text-[11px] text-slate-400 truncate block">
+            <span
+              v-if="!cat.isDefault && cat.keywords?.length"
+              class="text-[11px] text-slate-400 truncate block"
+            >
               {{ cat.keywords.join(', ') }}
             </span>
           </div>
           <!-- Edit/delete for custom categories -->
-          <button v-if="!cat.isDefault" class="text-slate-400 hover:text-slate-600 p-1" :aria-label="`Edit ${cat.name}`" @click="startEdit(cat)">
-            <UIcon name="i-lucide-pencil" class="text-sm" aria-hidden="true" />
+          <button
+            v-if="!cat.isDefault"
+            class="text-slate-400 hover:text-slate-600 p-1"
+            :aria-label="`Edit ${cat.name}`"
+            @click="startEdit(cat)"
+          >
+            <UIcon
+              name="i-lucide-pencil"
+              class="text-sm"
+              aria-hidden="true"
+            />
           </button>
-          <button v-if="!cat.isDefault" class="text-slate-400 hover:text-red-500 p-1" :aria-label="`Delete ${cat.name}`" @click="handleDelete(cat.id)">
-            <UIcon name="i-lucide-trash-2" class="text-sm" aria-hidden="true" />
+          <button
+            v-if="!cat.isDefault"
+            class="text-slate-400 hover:text-red-500 p-1"
+            :aria-label="`Delete ${cat.name}`"
+            @click="handleDelete(cat.id)"
+          >
+            <UIcon
+              name="i-lucide-trash-2"
+              class="text-sm"
+              aria-hidden="true"
+            />
           </button>
           <!-- Toggle switch for ALL categories -->
           <button

@@ -17,7 +17,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'sales', name: 'Sales', icon: 'i-lucide-trending-up', color: 'text-emerald-600', bgColor: 'bg-emerald-100', dotColor: '#10b981', type: 'income', isDefault: true },
   { id: 'momo', name: 'MoMo Received', icon: 'i-lucide-smartphone', color: 'text-yellow-600', bgColor: 'bg-yellow-100', dotColor: '#ca8a04', type: 'income', isDefault: true },
   { id: 'salary', name: 'Salary/Wages', icon: 'i-lucide-wallet', color: 'text-violet-600', bgColor: 'bg-violet-100', dotColor: '#7c3aed', type: 'income', isDefault: true },
-  { id: 'other_income', name: 'Other Income', icon: 'i-lucide-plus-circle', color: 'text-lime-600', bgColor: 'bg-lime-100', dotColor: '#65a30d', type: 'income', isDefault: true },
+  { id: 'other_income', name: 'Other Income', icon: 'i-lucide-plus-circle', color: 'text-lime-600', bgColor: 'bg-lime-100', dotColor: '#65a30d', type: 'income', isDefault: true }
 ]
 
 export interface BusinessType {
@@ -34,5 +34,5 @@ export const BUSINESS_TYPES: BusinessType[] = [
   { value: 'salon', label: 'Salon/Barber', icon: 'i-lucide-sparkles' },
   { value: 'retail', label: 'General Retail', icon: 'i-lucide-shopping-bag' },
   { value: 'freelancer', label: 'Freelancer', icon: 'i-lucide-laptop' },
-  { value: 'other', label: 'Other', icon: 'i-lucide-briefcase' },
+  { value: 'other', label: 'Other', icon: 'i-lucide-briefcase' }
 ]

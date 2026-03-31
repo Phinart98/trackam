@@ -29,7 +29,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   gifts: ['church', 'tithe', 'offering', 'gift', 'donation', 'wedding', 'funeral', 'family'],
   sales: ['sold', 'sale', 'customer', 'paid me', 'received payment', 'profit', 'fabric', 'kente', 'batik', 'shirt'],
   momo: ['momo', 'mobile money', 'received', 'transfer', 'sent'],
-  salary: ['salary', 'wage', 'pay', 'paycheck', 'allowance'],
+  salary: ['salary', 'wage', 'pay', 'paycheck', 'allowance']
 }
 
 const INCOME_KEYWORDS = ['sold', 'received', 'earned', 'income', 'payment', 'sale', 'profit', 'wages', 'salary', 'collected', 'momo received', 'transfer in']
@@ -67,7 +67,7 @@ function extractAmount(text: string): number {
   const patterns = [
     /(?:gh[s₵]|ghs|cedis?|naira|ksh|ugx|₦|₵)\s*(\d[\d,]*(?:\.\d+)?)/gi,
     /(\d[\d,]*(?:\.\d+)?)\s*(?:gh[s₵]|ghs|cedis?|naira|ksh)/gi,
-    /(\d[\d,]*(?:\.\d+)?)/g,
+    /(\d[\d,]*(?:\.\d+)?)/g
   ]
 
   for (const pattern of patterns) {
@@ -99,7 +99,7 @@ const IMAGE_PARSE_RESULTS: ParsedTransaction[] = [
   { amount: 85.50, category: 'food', description: 'Grocery receipt — Makola Supermarket', type: 'expense', vendor: 'Makola Supermarket', date: new Date().toISOString(), confidence: 94 },
   { amount: 45, category: 'market', description: 'Receipt — fabric and accessories', type: 'expense', vendor: 'Kantamanto Market', date: new Date().toISOString(), confidence: 87 },
   // FX mock — tests the blue conversion pill (USD receipt → GHS)
-  { amount: 462, category: 'supplies', description: 'Amazon order — business supplies', type: 'expense', vendor: 'Amazon.com', date: new Date().toISOString(), confidence: 91, originalCurrency: 'USD', originalAmount: 30, exchangeRate: 15.4 },
+  { amount: 462, category: 'supplies', description: 'Amazon order — business supplies', type: 'expense', vendor: 'Amazon.com', date: new Date().toISOString(), confidence: 91, originalCurrency: 'USD', originalAmount: 30, exchangeRate: 15.4 }
 ]
 
 export const useAI = () => {
@@ -113,7 +113,7 @@ export const useAI = () => {
     if (useRealBackend) {
       return apiFetch<ParsedTransaction>(apiBaseUrl, '/api/ai/parse-text', {
         text: input,
-        currency: auth.profile?.currency ?? 'GHS',
+        currency: auth.profile?.currency ?? 'GHS'
       })
     }
     await delay(1500)
@@ -133,7 +133,7 @@ export const useAI = () => {
       description: input.charAt(0).toUpperCase() + input.slice(1),
       type,
       date: new Date().toISOString(),
-      confidence,
+      confidence
     }
   }
 
@@ -151,10 +151,10 @@ export const useAI = () => {
 
   const askAdvisor = async (
     question: string,
-    context: { totalIncome: number; totalExpenses: number; balance: number; topCategory: string; transactionCount: number; currency: string },
+    context: { totalIncome: number, totalExpenses: number, balance: number, topCategory: string, transactionCount: number, currency: string }
   ): Promise<string> => {
     if (useRealBackend) {
-      const res = await apiFetch<{ reply: string; sessionId: string }>(apiBaseUrl, '/api/ai/advisor', {
+      const res = await apiFetch<{ reply: string, sessionId: string }>(apiBaseUrl, '/api/ai/advisor', {
         question,
         context
       })
@@ -176,7 +176,7 @@ export const useAI = () => {
 
     if (q.includes('save') || q.includes('saving')) {
       const savingsTarget = totalIncome * 0.2
-      return `A good rule is to save **20% of income** — for you, that's about **${fmt(savingsTarget)}** this month. Based on your transactions, your biggest saving opportunity is reducing ${topCategory} expenses. Even cutting 10% there would save you **${fmt(totalExpenses * 0.1)}** monthly. Consider a separate \"savings wallet\" and move money there on the day you receive income.`
+      return `A good rule is to save **20% of income** — for you, that's about **${fmt(savingsTarget)}** this month. Based on your transactions, your biggest saving opportunity is reducing ${topCategory} expenses. Even cutting 10% there would save you **${fmt(totalExpenses * 0.1)}** monthly. Consider a separate 'savings wallet' and move money there on the day you receive income.`
     }
 
     if (q.includes('compare') || q.includes('week') || q.includes('last')) {

@@ -4,9 +4,8 @@ import { calculateBurnRate, trendDirection } from '~/utils/forecasting'
 
 export type ChartRange = '1W' | '1M' | '3M' | '6M'
 
-const sumByType = (txs: { type: string; amount: number }[], type: 'income' | 'expense') =>
+const sumByType = (txs: { type: string, amount: number }[], type: 'income' | 'expense') =>
   txs.filter(t => t.type === type).reduce((s, t) => s + t.amount, 0)
-
 
 export const useTransactionStore = defineStore('transactions', {
   state: () => ({
@@ -14,8 +13,8 @@ export const useTransactionStore = defineStore('transactions', {
     chartRange: '1M' as ChartRange,
     loading: false,
     aiInsight: null as string | null,
-    aiInsightAt: 0,       // unix timestamp ms when last generated
-    aiInsightTxCount: 0,  // transaction count when last generated
+    aiInsightAt: 0, // unix timestamp ms when last generated
+    aiInsightTxCount: 0 // transaction count when last generated
   }),
 
   getters: {
@@ -29,11 +28,11 @@ export const useTransactionStore = defineStore('transactions', {
       return this.sorted.slice(0, 5)
     },
 
-    categoryBreakdown(): { categoryId: string; name: string; amount: number; color: string; bgColor: string; dotColor: string; percentage: number }[] {
+    categoryBreakdown(): { categoryId: string, name: string, amount: number, color: string, bgColor: string, dotColor: string, percentage: number }[] {
       const expenses = this.transactions.filter(t => t.type === 'expense')
       const total = expenses.reduce((s, t) => s + t.amount, 0)
       const grouped: Record<string, number> = {}
-      expenses.forEach(t => { grouped[t.category] = (grouped[t.category] ?? 0) + t.amount })
+      expenses.forEach(t => (grouped[t.category] = (grouped[t.category] ?? 0) + t.amount))
 
       const catStore = useCategoryStore()
       return Object.entries(grouped)
@@ -52,7 +51,7 @@ export const useTransactionStore = defineStore('transactions', {
         .sort((a, b) => b.amount - a.amount)
     },
 
-    chartData(): { labels: string[]; income: number[]; expenses: number[] } {
+    chartData(): { labels: string[], income: number[], expenses: number[] } {
       const range = this.chartRange
       const labels: string[] = []
       const income: number[] = []
@@ -80,7 +79,7 @@ export const useTransactionStore = defineStore('transactions', {
           const weekStart = new Date(weekEnd)
           weekStart.setDate(weekStart.getDate() - 7)
           labels.push(weekStart.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }))
-          const txs = this.transactions.filter(t => {
+          const txs = this.transactions.filter((t) => {
             const d = new Date(t.date)
             return d >= weekStart && d < weekEndInclusive
           })
@@ -107,7 +106,7 @@ export const useTransactionStore = defineStore('transactions', {
       const result = calculateBurnRate(this.transactions, budget)
       const trend = trendDirection(this.transactions)
       return { ...result, trend }
-    },
+    }
 
   },
 
@@ -128,7 +127,11 @@ export const useTransactionStore = defineStore('transactions', {
         })
         this.transactions = data
       } catch (err) {
-        if ((err as any)?.statusCode === 401) { await useAuthStore().logout(); await navigateTo('/login'); return }
+        if ((err as { statusCode?: number })?.statusCode === 401) {
+          await useAuthStore().logout()
+          await navigateTo('/login')
+          return
+        }
         console.warn('Failed to fetch transactions from API:', err)
       } finally {
         this.loading = false
@@ -171,9 +174,9 @@ export const useTransactionStore = defineStore('transactions', {
             method: 'DELETE',
             headers: token ? { Authorization: `Bearer ${token}` } : {}
           })
-        } catch (err: any) {
+        } catch (err: unknown) {
           // Only remove locally if API returned 404 (already deleted)
-          if (err?.statusCode !== 404) {
+          if ((err as { statusCode?: number })?.statusCode !== 404) {
             console.warn('Failed to delete from API:', err)
             return
           }
@@ -189,11 +192,10 @@ export const useTransactionStore = defineStore('transactions', {
 
     addTransaction(tx: Omit<Transaction, 'id'>) {
       this.transactions.unshift({ ...tx, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` })
-    },
+    }
   },
 
   persist: {
     pick: ['transactions', 'chartRange', 'aiInsight', 'aiInsightAt', 'aiInsightTxCount']
   }
 })
-

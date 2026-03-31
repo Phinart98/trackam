@@ -31,7 +31,7 @@ export const SUPPORTED_CURRENCIES: SupportedCurrency[] = [
   // International
   { code: 'USD', label: 'US Dollar', symbol: '$', flag: '🇺🇸' },
   { code: 'EUR', label: 'Euro', symbol: '€', flag: '🇪🇺' },
-  { code: 'GBP', label: 'British Pound', symbol: '£', flag: '🇬🇧' },
+  { code: 'GBP', label: 'British Pound', symbol: '£', flag: '🇬🇧' }
 ]
 
 export const getCurrencySymbol = (code: string): string =>

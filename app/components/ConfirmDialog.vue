@@ -12,15 +12,32 @@ const { state, accept, cancel } = useConfirm()
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="state.show" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30" @click.self="cancel">
+      <div
+        v-if="state.show"
+        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30"
+        @click.self="cancel"
+      >
         <div class="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-sm p-5 space-y-4 safe-area-bottom">
-          <h3 class="text-sm font-bold text-slate-800">{{ state.title }}</h3>
-          <p v-if="state.message" class="text-sm text-slate-500 leading-relaxed">{{ state.message }}</p>
+          <h3 class="text-sm font-bold text-slate-800">
+            {{ state.title }}
+          </h3>
+          <p
+            v-if="state.message"
+            class="text-sm text-slate-500 leading-relaxed"
+          >
+            {{ state.message }}
+          </p>
           <div class="flex gap-2">
-            <button class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors" @click="cancel">
+            <button
+              class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors"
+              @click="cancel"
+            >
               Cancel
             </button>
-            <button class="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-semibold text-sm hover:bg-red-600 active:scale-[0.97] transition-all" @click="accept">
+            <button
+              class="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-semibold text-sm hover:bg-red-600 active:scale-[0.97] transition-all"
+              @click="accept"
+            >
               {{ state.confirmLabel }}
             </button>
           </div>

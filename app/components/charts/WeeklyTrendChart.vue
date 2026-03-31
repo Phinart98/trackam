@@ -4,7 +4,7 @@ import type { ChartOptions, TooltipItem } from 'chart.js'
 import { getCurrencySymbol } from '~/utils/formatters'
 
 const props = defineProps<{
-  data: { labels: string[]; income: number[]; expenses: number[] }
+  data: { labels: string[], income: number[], expenses: number[] }
   currency?: string
 }>()
 
@@ -57,7 +57,14 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
 </script>
 
 <template>
-  <div style="height: 200px" role="img" aria-label="Income and expenses trend chart">
-    <Line :data="chartData" :options="chartOptions" />
+  <div
+    style="height: 200px"
+    role="img"
+    aria-label="Income and expenses trend chart"
+  >
+    <Line
+      :data="chartData"
+      :options="chartOptions"
+    />
   </div>
 </template>

@@ -30,7 +30,7 @@ export const ICON_PRESETS = [
   // Entertainment & media
   'i-lucide-music', 'i-lucide-camera', 'i-lucide-gamepad-2', 'i-lucide-tv',
   // Misc
-  'i-lucide-package', 'i-lucide-sparkles', 'i-lucide-crown', 'i-lucide-church',
+  'i-lucide-package', 'i-lucide-sparkles', 'i-lucide-crown', 'i-lucide-church'
 ]
 
 export const COLOR_PRESETS = [
@@ -45,9 +45,8 @@ export const COLOR_PRESETS = [
   { name: 'Indigo', color: 'text-indigo-500', bgColor: 'bg-indigo-100', dotColor: '#6366f1' },
   { name: 'Purple', color: 'text-purple-500', bgColor: 'bg-purple-100', dotColor: '#a855f7' },
   { name: 'Pink', color: 'text-pink-500', bgColor: 'bg-pink-100', dotColor: '#ec4899' },
-  { name: 'Slate', color: 'text-slate-500', bgColor: 'bg-slate-100', dotColor: '#64748b' },
+  { name: 'Slate', color: 'text-slate-500', bgColor: 'bg-slate-100', dotColor: '#64748b' }
 ]
-
 
 function generateId(name: string, existingIds: string[]): string {
   let slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
@@ -59,7 +58,7 @@ function generateId(name: string, existingIds: string[]): string {
 export const useCategoryStore = defineStore('categories', {
   state: () => ({
     custom: [] as Category[],
-    hiddenIds: [] as string[],
+    hiddenIds: [] as string[]
   }),
 
   getters: {
@@ -91,11 +90,11 @@ export const useCategoryStore = defineStore('categories', {
     /** All category IDs (for slug collision detection) */
     allIds(): string[] {
       return [...DEFAULT_CATEGORIES.map(c => c.id), ...this.custom.map(c => c.id)]
-    },
+    }
   },
 
   actions: {
-    addCategory(input: { name: string; icon: string; color: string; bgColor: string; dotColor: string; type: 'income' | 'expense'; keywords?: string[] }) {
+    addCategory(input: { name: string, icon: string, color: string, bgColor: string, dotColor: string, type: 'income' | 'expense', keywords?: string[] }) {
       const id = generateId(input.name, this.allIds)
       const cat: Category = { ...input, id, isDefault: false }
       this.custom.push(cat)
@@ -171,8 +170,8 @@ export const useCategoryStore = defineStore('categories', {
       } catch (err) {
         console.warn('Failed to delete category from API:', err)
       }
-    },
+    }
   },
 
-  persist: true,
+  persist: true
 })

@@ -56,8 +56,7 @@ async function send(text?: string) {
     const lastMsg = chat.messages[chat.messages.length - 1]!
     await nextTick()
     await streamText(lastMsg.id, reply)
-  }
-  catch {
+  } catch {
     isThinking.value = false
     chat.addMessage('assistant', 'Sorry, I had trouble processing that. Please try again.')
     await nextTick()
@@ -86,26 +85,45 @@ function renderMarkdown(text: string) {
     <div class="px-4 pt-4 pb-3 border-b border-slate-100">
       <div class="flex items-center gap-2">
         <span class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-          <UIcon name="i-lucide-brain" class="text-emerald-600 text-base" />
+          <UIcon
+            name="i-lucide-brain"
+            class="text-emerald-600 text-base"
+          />
         </span>
         <div>
-          <h1 class="text-base font-bold text-slate-900 font-display">AI Advisor</h1>
-          <p class="text-xs text-slate-400">Powered by your transaction data</p>
+          <h1 class="text-base font-bold text-slate-900 font-display">
+            AI Advisor
+          </h1>
+          <p class="text-xs text-slate-400">
+            Powered by your transaction data
+          </p>
         </div>
       </div>
     </div>
 
     <!-- Messages area -->
-    <div ref="messagesEl" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-
+    <div
+      ref="messagesEl"
+      class="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+    >
       <!-- Empty state with suggestions -->
-      <div v-if="chat.messages.length === 0" class="space-y-5 pt-2">
+      <div
+        v-if="chat.messages.length === 0"
+        class="space-y-5 pt-2"
+      >
         <div class="text-center">
           <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-emerald-200">
-            <UIcon name="i-lucide-sparkles" class="text-white text-2xl" />
+            <UIcon
+              name="i-lucide-sparkles"
+              class="text-white text-2xl"
+            />
           </div>
-          <p class="text-sm font-semibold text-slate-800 mb-1">Your personal financial advisor</p>
-          <p class="text-xs text-slate-400">Ask me anything about your money</p>
+          <p class="text-sm font-semibold text-slate-800 mb-1">
+            Your personal financial advisor
+          </p>
+          <p class="text-xs text-slate-400">
+            Ask me anything about your money
+          </p>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
@@ -131,28 +149,43 @@ function renderMarkdown(text: string) {
         <div
           v-if="msg.role === 'user'"
           class="max-w-[80%] px-4 py-3 rounded-2xl rounded-br-sm text-[15px] leading-relaxed bg-emerald-500 text-white"
-        >{{ msg.content }}</div>
+        >
+          {{ msg.content }}
+        </div>
         <!-- Assistant messages: markdown rendered (HTML-escaped first, then bold applied) -->
         <div
           v-else
           class="max-w-[80%] px-4 py-3 rounded-2xl rounded-bl-sm text-[15px] leading-relaxed bg-slate-100 text-slate-800"
         >
           <span v-html="renderMarkdown(msg.content)" />
-          <span v-if="streamingId === msg.id" class="inline-block w-0.5 h-4 bg-slate-400 ml-0.5 align-middle animate-pulse" />
+          <span
+            v-if="streamingId === msg.id"
+            class="inline-block w-0.5 h-4 bg-slate-400 ml-0.5 align-middle animate-pulse"
+          />
         </div>
       </div>
 
       <!-- Typing indicator -->
-      <div v-if="isThinking" class="flex justify-start">
+      <div
+        v-if="isThinking"
+        class="flex justify-start"
+      >
         <div class="bg-slate-100 rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1 items-center">
-          <span v-for="i in 3" :key="i" class="w-2 h-2 rounded-full bg-slate-400 animate-bounce" :style="{ animationDelay: `${(i - 1) * 0.15}s` }" />
+          <span
+            v-for="i in 3"
+            :key="i"
+            class="w-2 h-2 rounded-full bg-slate-400 animate-bounce"
+            :style="{ animationDelay: `${(i - 1) * 0.15}s` }"
+          />
         </div>
       </div>
-
     </div>
 
     <!-- Input bar -->
-    <div class="px-4 py-3 border-t border-slate-100 bg-white" style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom))">
+    <div
+      class="px-4 py-3 border-t border-slate-100 bg-white"
+      style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom))"
+    >
       <div class="flex gap-2">
         <input
           v-model="userInput"
@@ -166,7 +199,10 @@ function renderMarkdown(text: string) {
           class="w-11 h-11 rounded-xl bg-emerald-500 flex items-center justify-center text-white disabled:opacity-50 active:scale-95 transition-all shadow-sm"
           @click="send()"
         >
-          <UIcon name="i-lucide-send" class="text-base" />
+          <UIcon
+            name="i-lucide-send"
+            class="text-base"
+          />
         </button>
       </div>
     </div>

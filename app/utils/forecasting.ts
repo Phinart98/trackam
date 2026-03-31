@@ -49,7 +49,7 @@ export function linearRegression(values: number[]): TrendLine {
   }
   const slope = den !== 0 ? num / den : 0
   const intercept = yMean - slope * xMean
-  return { slope, intercept, predict: (i) => Math.max(0, intercept + slope * i) }
+  return { slope, intercept, predict: i => Math.max(0, intercept + slope * i) }
 }
 
 export interface BurnRate {
@@ -127,8 +127,10 @@ export function computeHealthScore(transactions: Transaction[], monthlyBudget: n
 
   // Factor 3: Budget adherence (25%)
   const burn = calculateBurnRate(transactions, monthlyBudget)
-  const budgetScore = burn.burnPercent <= 70 ? 100
-    : burn.burnPercent <= 100 ? Math.round(100 - (burn.burnPercent - 70) * 2)
+  const budgetScore = burn.burnPercent <= 70
+    ? 100
+    : burn.burnPercent <= 100
+      ? Math.round(100 - (burn.burnPercent - 70) * 2)
       : Math.max(0, Math.round(40 - (burn.burnPercent - 100)))
 
   // Factor 4: Tracking consistency — days with txs out of last 30 (15%)
@@ -169,11 +171,11 @@ export function weekOverWeek(transactions: Transaction[]): WeekPulse {
   const prevWeekStart = new Date(weekStart)
   prevWeekStart.setDate(prevWeekStart.getDate() - 7)
 
-  const thisWeek = transactions.filter(t => {
+  const thisWeek = transactions.filter((t) => {
     const d = new Date(t.date)
     return d >= weekStart && d <= today
   })
-  const lastWeek = transactions.filter(t => {
+  const lastWeek = transactions.filter((t) => {
     const d = new Date(t.date)
     return d >= prevWeekStart && d < weekStart
   })
@@ -219,8 +221,8 @@ export function detectAnomalies(transactions: Transaction[], currency: string): 
   // Category anomalies — compare this week's category spend to 30-day weekly average
   const catTotals30d: Record<string, number> = {}
   const catTotals7d: Record<string, number> = {}
-  recentTxs.forEach(t => { catTotals30d[t.category] = (catTotals30d[t.category] ?? 0) + t.amount })
-  thisWeekTxs.forEach(t => { catTotals7d[t.category] = (catTotals7d[t.category] ?? 0) + t.amount })
+  recentTxs.forEach(t => (catTotals30d[t.category] = (catTotals30d[t.category] ?? 0) + t.amount))
+  thisWeekTxs.forEach(t => (catTotals7d[t.category] = (catTotals7d[t.category] ?? 0) + t.amount))
 
   for (const [cat, weekTotal] of Object.entries(catTotals7d)) {
     const monthTotal = catTotals30d[cat] ?? 0

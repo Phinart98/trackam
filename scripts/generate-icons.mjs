@@ -3,7 +3,7 @@
  * Run: node scripts/generate-icons.mjs
  */
 import { deflateSync } from 'zlib'
-import { writeFileSync, mkdirSync } from 'fs'
+import { writeFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -36,7 +36,8 @@ function solidPng(size, r, g, b) {
   const ihdr = Buffer.alloc(13)
   ihdr.writeUInt32BE(size, 0)
   ihdr.writeUInt32BE(size, 4)
-  ihdr[8] = 8; ihdr[9] = 2 // 8-bit RGB
+  ihdr[8] = 8
+  ihdr[9] = 2 // 8-bit RGB
 
   const rowSize = 1 + size * 3
   const raw = Buffer.alloc(size * rowSize)
@@ -44,7 +45,9 @@ function solidPng(size, r, g, b) {
     raw[y * rowSize] = 0 // filter: None
     for (let x = 0; x < size; x++) {
       const off = y * rowSize + 1 + x * 3
-      raw[off] = r; raw[off + 1] = g; raw[off + 2] = b
+      raw[off] = r
+      raw[off + 1] = g
+      raw[off + 2] = b
     }
   }
 
@@ -52,7 +55,7 @@ function solidPng(size, r, g, b) {
     sig,
     pngChunk('IHDR', ihdr),
     pngChunk('IDAT', deflateSync(raw)),
-    pngChunk('IEND', Buffer.alloc(0)),
+    pngChunk('IEND', Buffer.alloc(0))
   ])
 }
 

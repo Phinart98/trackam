@@ -39,7 +39,7 @@ const heatmapData = computed(() => {
   const values = [...dailyMap.values()]
   const maxAmount = values.length ? Math.max(...values) : 1
 
-  const weeks: { date: Date; iso: string; amount: number; intensity: number }[][] = []
+  const weeks: { date: Date, iso: string, amount: number, intensity: number }[][] = []
   let currentWeek: typeof weeks[0] = []
   const cursor = new Date(start)
 
@@ -75,7 +75,7 @@ const cellSize = computed(() => {
 })
 
 const monthLabels = computed(() => {
-  const labels: { label: string; weekIdx: number }[] = []
+  const labels: { label: string, weekIdx: number }[] = []
   let lastMonth = -1
 
   heatmapData.value.weeks.forEach((week, wIdx) => {
@@ -98,7 +98,10 @@ const narrative = computed(() => {
   let peakDay = ''
   let peakAmount = 0
   for (const [day, amount] of map) {
-    if (amount > peakAmount) { peakDay = day; peakAmount = amount }
+    if (amount > peakAmount) {
+      peakDay = day
+      peakAmount = amount
+    }
   }
 
   const dayName = new Date(peakDay).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })
@@ -119,9 +122,16 @@ function intensityColor(intensity: number): string {
 </script>
 
 <template>
-  <div ref="containerRef" role="img" aria-label="Daily spending activity heatmap">
+  <div
+    ref="containerRef"
+    role="img"
+    aria-label="Daily spending activity heatmap"
+  >
     <!-- Month labels -->
-    <div class="relative ml-7" style="height: 14px">
+    <div
+      class="relative ml-7"
+      style="height: 14px"
+    >
       <span
         v-for="m in monthLabels"
         :key="m.weekIdx"
@@ -134,7 +144,10 @@ function intensityColor(intensity: number): string {
 
     <div class="flex gap-0.5 mt-1">
       <!-- Day labels -->
-      <div class="flex flex-col shrink-0 mr-1" :style="{ gap: `${GAP}px` }">
+      <div
+        class="flex flex-col shrink-0 mr-1"
+        :style="{ gap: `${GAP}px` }"
+      >
         <span
           v-for="label in dayLabels"
           :key="label"
@@ -146,7 +159,10 @@ function intensityColor(intensity: number): string {
       </div>
 
       <!-- Heatmap grid -->
-      <div class="flex" :style="{ gap: `${GAP}px` }">
+      <div
+        class="flex"
+        :style="{ gap: `${GAP}px` }"
+      >
         <div
           v-for="(week, wIdx) in heatmapData.weeks"
           :key="wIdx"
@@ -160,7 +176,7 @@ function intensityColor(intensity: number): string {
             :style="{
               width: `${cellSize}px`,
               height: `${cellSize}px`,
-              backgroundColor: intensityColor(day.intensity),
+              backgroundColor: intensityColor(day.intensity)
             }"
             :title="day.iso ? `${day.iso}: ${day.amount > 0 ? day.amount.toFixed(0) : 'No spending'}` : ''"
           />
@@ -171,9 +187,19 @@ function intensityColor(intensity: number): string {
     <!-- Legend -->
     <div class="flex items-center gap-1.5 mt-2 ml-7">
       <span class="text-[9px] text-slate-400">Less</span>
-      <span v-for="i in 5" :key="i" class="rounded-sm" :style="{ width: `${cellSize}px`, height: `${cellSize}px`, backgroundColor: intensityColor((i - 1) * 0.25) }" />
+      <span
+        v-for="i in 5"
+        :key="i"
+        class="rounded-sm"
+        :style="{ width: `${cellSize}px`, height: `${cellSize}px`, backgroundColor: intensityColor((i - 1) * 0.25) }"
+      />
       <span class="text-[9px] text-slate-400">More</span>
     </div>
-    <p v-if="narrative" class="text-[11px] text-slate-500 mt-2 ml-7">{{ narrative }}</p>
+    <p
+      v-if="narrative"
+      class="text-[11px] text-slate-500 mt-2 ml-7"
+    >
+      {{ narrative }}
+    </p>
   </div>
 </template>

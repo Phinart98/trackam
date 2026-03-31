@@ -8,11 +8,51 @@ export default defineNuxtConfig({
     '@vite-pwa/nuxt'
   ],
 
+  ssr: false,
+
+  devtools: {
+    enabled: false
+  },
+
+  app: {
+    head: {
+      title: 'TrackAm — Track Your Money, Grow Your Business',
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+        { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@700;800&display=swap' }
+      ]
+    }
+  },
+
+  css: ['~/assets/css/main.css'],
+
   runtimeConfig: {
     public: {
       supabaseUrl: '',
       supabaseAnonKey: '',
       apiBaseUrl: ''
+    }
+  },
+
+  compatibilityDate: '2025-01-15',
+
+  vite: {
+    resolve: {
+      dedupe: ['pinia', 'vue', '@vue/runtime-core']
+    },
+    optimizeDeps: {
+      include: ['chart.js', 'vue-chartjs', 'pinia-plugin-persistedstate']
+    }
+  },
+
+  eslint: {
+    config: {
+      stylistic: {
+        commaDangle: 'never',
+        braceStyle: '1tbs'
+      }
     }
   },
 
@@ -34,46 +74,6 @@ export default defineNuxtConfig({
     workbox: {
       navigateFallback: '/',
       globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}']
-    }
-  },
-
-  devtools: {
-    enabled: false
-  },
-
-  css: ['~/assets/css/main.css'],
-
-  app: {
-    head: {
-      title: 'TrackAm — Track Your Money, Grow Your Business',
-      link: [
-        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
-        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
-        { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@700;800&display=swap' }
-      ]
-    }
-  },
-
-  ssr: false,
-
-  vite: {
-    resolve: {
-      dedupe: ['pinia', 'vue', '@vue/runtime-core']
-    },
-    optimizeDeps: {
-      include: ['chart.js', 'vue-chartjs', 'pinia-plugin-persistedstate']
-    }
-  },
-
-  compatibilityDate: '2025-01-15',
-
-  eslint: {
-    config: {
-      stylistic: {
-        commaDangle: 'never',
-        braceStyle: '1tbs'
-      }
     }
   }
 })

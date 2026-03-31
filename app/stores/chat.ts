@@ -3,7 +3,7 @@ import type { ChatMessage } from '~/types'
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
-    messages: [] as ChatMessage[],
+    messages: [] as ChatMessage[]
   }),
 
   actions: {
@@ -12,7 +12,7 @@ export const useChatStore = defineStore('chat', {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         role,
         content,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       })
     },
     updateMessageContent(id: string, content: string) {
@@ -21,8 +21,8 @@ export const useChatStore = defineStore('chat', {
     },
     clearChat() {
       this.messages = []
-    },
+    }
   },
 
-  persist: true,
+  persist: true
 })

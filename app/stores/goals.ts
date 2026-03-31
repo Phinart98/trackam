@@ -3,7 +3,7 @@ import type { Goal } from '~/types'
 
 export const useGoalStore = defineStore('goals', {
   state: () => ({
-    goals: [] as Goal[],
+    goals: [] as Goal[]
   }),
 
   getters: {
@@ -28,12 +28,15 @@ export const useGoalStore = defineStore('goals', {
     daysLeftMap(): Record<string, number | null> {
       const map: Record<string, number | null> = {}
       for (const g of this.goals) {
-        if (!g.deadline) { map[g.id] = null; continue }
+        if (!g.deadline) {
+          map[g.id] = null
+          continue
+        }
         const diff = new Date(g.deadline).getTime() - Date.now()
         map[g.id] = Math.max(0, Math.ceil(diff / 86400000))
       }
       return map
-    },
+    }
   },
 
   actions: {
@@ -41,7 +44,7 @@ export const useGoalStore = defineStore('goals', {
       const goal: Goal = {
         ...input,
         id: `goal_${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        createdAt: new Date().toISOString(),
+        createdAt: new Date().toISOString()
       }
       this.goals.push(goal)
       return goal
@@ -69,8 +72,8 @@ export const useGoalStore = defineStore('goals', {
 
     removeGoal(id: string) {
       this.goals = this.goals.filter(g => g.id !== id)
-    },
+    }
   },
 
-  persist: true,
+  persist: true
 })

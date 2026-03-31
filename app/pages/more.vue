@@ -11,8 +11,8 @@ const businessTypes = BUSINESS_TYPES
 
 const businessTypeLabel = computed(() =>
   businessTypes.find(b => b.value === auth.profile?.businessType)?.label
-    ?? auth.profile?.businessType
-    ?? 'Not set'
+  ?? auth.profile?.businessType
+  ?? 'Not set'
 )
 
 // ── Profile editing ───────────────────────────────────────────────────────────
@@ -56,7 +56,9 @@ function scheduleProfileSave() {
 watch([selectedCurrency, budget], ([newCur, newBudget], [oldCur, oldBudget]) => {
   if (newCur !== oldCur || newBudget !== oldBudget) scheduleProfileSave()
 })
-onUnmounted(() => { if (saveTimer) clearTimeout(saveTimer) })
+onUnmounted(() => {
+  if (saveTimer) clearTimeout(saveTimer)
+})
 
 // ── Danger zone ───────────────────────────────────────────────────────────────
 const { confirm } = useConfirm()
@@ -79,14 +81,18 @@ function logout() {
 
 <template>
   <div class="px-4 pt-4 pb-8 lg:px-6 lg:pt-6 max-w-2xl lg:mx-0 space-y-5">
-
     <!-- Header -->
-    <h1 class="text-xl font-bold text-slate-900 font-display lg:text-2xl">Account</h1>
+    <h1 class="text-xl font-bold text-slate-900 font-display lg:text-2xl">
+      Account
+    </h1>
 
     <!-- ── Profile Card ─────────────────────────────────────────────────────── -->
     <div class="relative bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-2xl shadow-lg shadow-emerald-200/50 overflow-hidden">
       <!-- Subtle texture overlay -->
-      <div class="absolute inset-0 opacity-[0.06] pointer-events-none" style="background-image: repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%), repeating-linear-gradient(-45deg, white 0, white 1px, transparent 0, transparent 50%); background-size: 20px 20px;" />
+      <div
+        class="absolute inset-0 opacity-[0.06] pointer-events-none"
+        style="background-image: repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%), repeating-linear-gradient(-45deg, white 0, white 1px, transparent 0, transparent 50%); background-size: 20px 20px;"
+      />
 
       <div class="relative p-5">
         <div class="flex items-start gap-4">
@@ -97,15 +103,25 @@ function logout() {
 
           <!-- Info -->
           <div class="flex-1 min-w-0">
-            <p class="font-bold text-lg text-white truncate">{{ auth.displayName }}</p>
-            <p class="text-emerald-200 text-sm truncate">{{ auth.profile?.email }}</p>
+            <p class="font-bold text-lg text-white truncate">
+              {{ auth.displayName }}
+            </p>
+            <p class="text-emerald-200 text-sm truncate">
+              {{ auth.profile?.email }}
+            </p>
             <div class="flex items-center gap-2 mt-1.5 flex-wrap">
               <span class="inline-flex items-center gap-1 text-xs font-medium bg-white/20 px-2.5 py-0.5 rounded-full text-white">
-                <UIcon name="i-lucide-briefcase" class="text-[10px]" />
+                <UIcon
+                  name="i-lucide-briefcase"
+                  class="text-[10px]"
+                />
                 {{ businessTypeLabel }}
               </span>
               <span class="inline-flex items-center gap-1 text-xs font-medium bg-white/20 px-2.5 py-0.5 rounded-full text-white">
-                <UIcon name="i-lucide-coins" class="text-[10px]" />
+                <UIcon
+                  name="i-lucide-coins"
+                  class="text-[10px]"
+                />
                 {{ getCurrencySymbol(auth.currency) }} {{ auth.currency }}
               </span>
             </div>
@@ -114,10 +130,13 @@ function logout() {
           <!-- Edit button -->
           <button
             class="w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors shrink-0"
-            @click="openProfileEdit"
             title="Edit profile"
+            @click="openProfileEdit"
           >
-            <UIcon name="i-lucide-pencil" class="text-white text-sm" />
+            <UIcon
+              name="i-lucide-pencil"
+              class="text-white text-sm"
+            />
           </button>
         </div>
       </div>
@@ -131,7 +150,10 @@ function logout() {
         leave-from-class="opacity-100 max-h-[500px]"
         leave-to-class="opacity-0 max-h-0"
       >
-        <div v-if="isEditingProfile" class="bg-white/10 border-t border-white/20 p-4 space-y-4">
+        <div
+          v-if="isEditingProfile"
+          class="bg-white/10 border-t border-white/20 p-4 space-y-4"
+        >
           <!-- Display name -->
           <div>
             <label class="text-xs font-semibold text-emerald-200 uppercase tracking-wide block mb-1.5">Display Name</label>
@@ -156,7 +178,10 @@ function logout() {
                   : 'bg-white/15 text-white hover:bg-white/25'"
                 @click="editBusinessType = bt.value"
               >
-                <UIcon :name="bt.icon" class="text-base" />
+                <UIcon
+                  :name="bt.icon"
+                  class="text-base"
+                />
                 <span class="text-[10px] font-medium leading-tight">{{ bt.label.split(' / ')[0] }}</span>
               </button>
             </div>
@@ -183,14 +208,19 @@ function logout() {
 
     <!-- ── Features Grid ─────────────────────────────────────────────────────── -->
     <div>
-      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1 mb-2">Features</p>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1 mb-2">
+        Features
+      </p>
       <div class="grid grid-cols-2 gap-2">
         <NuxtLink
           to="/goals"
           class="flex items-center gap-3 bg-white rounded-xl border border-slate-200 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors"
         >
           <span class="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
-            <UIcon name="i-lucide-target" class="text-amber-500 text-base" />
+            <UIcon
+              name="i-lucide-target"
+              class="text-amber-500 text-base"
+            />
           </span>
           <div class="min-w-0">
             <p class="text-sm font-semibold text-slate-800">Goals</p>
@@ -203,7 +233,10 @@ function logout() {
           class="flex items-center gap-3 bg-white rounded-xl border border-slate-200 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors"
         >
           <span class="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
-            <UIcon name="i-lucide-tags" class="text-emerald-500 text-base" />
+            <UIcon
+              name="i-lucide-tags"
+              class="text-emerald-500 text-base"
+            />
           </span>
           <div class="min-w-0">
             <p class="text-sm font-semibold text-slate-800">Categories</p>
@@ -215,9 +248,10 @@ function logout() {
 
     <!-- ── Preferences ─────────────────────────────────────────────────────── -->
     <div>
-      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1 mb-2">Preferences</p>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1 mb-2">
+        Preferences
+      </p>
       <div class="bg-white rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-50">
-
         <!-- Currency -->
         <div class="px-4 py-3.5">
           <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-2">Currency</label>
@@ -225,7 +259,11 @@ function logout() {
             v-model="selectedCurrency"
             class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-emerald-400"
           >
-            <option v-for="c in SUPPORTED_CURRENCIES" :key="c.code" :value="c.code">
+            <option
+              v-for="c in SUPPORTED_CURRENCIES"
+              :key="c.code"
+              :value="c.code"
+            >
               {{ c.flag }} {{ c.label }} ({{ c.symbol }})
             </option>
           </select>
@@ -246,23 +284,30 @@ function logout() {
             >
           </div>
         </div>
-
       </div>
     </div>
 
     <!-- ── Data ───────────────────────────────────────────────────────────── -->
     <div>
-      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1 mb-2">Data</p>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1 mb-2">
+        Data
+      </p>
       <div class="bg-white rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-50">
-
         <!-- Export PDF (coming soon) -->
         <div class="flex items-center gap-3 px-4 py-3.5 opacity-50">
           <span class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-            <UIcon name="i-lucide-file-down" class="text-slate-500 text-base" />
+            <UIcon
+              name="i-lucide-file-down"
+              class="text-slate-500 text-base"
+            />
           </span>
           <div class="flex-1">
-            <p class="text-sm font-semibold text-slate-800">Export PDF Report</p>
-            <p class="text-xs text-slate-400">Download a financial summary</p>
+            <p class="text-sm font-semibold text-slate-800">
+              Export PDF Report
+            </p>
+            <p class="text-xs text-slate-400">
+              Download a financial summary
+            </p>
           </div>
           <span class="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full shrink-0">Soon</span>
         </div>
@@ -273,14 +318,20 @@ function logout() {
           @click="confirmClearData"
         >
           <span class="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-            <UIcon name="i-lucide-trash-2" class="text-red-500 text-base" />
+            <UIcon
+              name="i-lucide-trash-2"
+              class="text-red-500 text-base"
+            />
           </span>
           <div>
-            <p class="text-sm font-semibold text-slate-800">Clear All Data</p>
-            <p class="text-xs text-slate-400">Remove transactions and chat history</p>
+            <p class="text-sm font-semibold text-slate-800">
+              Clear All Data
+            </p>
+            <p class="text-xs text-slate-400">
+              Remove transactions and chat history
+            </p>
           </div>
         </button>
-
       </div>
     </div>
 
@@ -288,11 +339,18 @@ function logout() {
     <div class="flex items-center justify-between px-1">
       <div class="flex items-center gap-2.5">
         <div class="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center">
-          <UIcon name="i-lucide-trending-up" class="text-white text-sm" />
+          <UIcon
+            name="i-lucide-trending-up"
+            class="text-white text-sm"
+          />
         </div>
         <div>
-          <p class="text-xs font-bold text-slate-700">TrackAm v1.0</p>
-          <p class="text-[11px] text-slate-400">AI finance for Africa</p>
+          <p class="text-xs font-bold text-slate-700">
+            TrackAm v1.0
+          </p>
+          <p class="text-[11px] text-slate-400">
+            AI finance for Africa
+          </p>
         </div>
       </div>
 
@@ -300,10 +358,12 @@ function logout() {
         class="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-red-200 text-red-500 font-semibold text-sm hover:bg-red-50 active:scale-[0.97] transition-all"
         @click="logout"
       >
-        <UIcon name="i-lucide-log-out" class="text-sm" />
+        <UIcon
+          name="i-lucide-log-out"
+          class="text-sm"
+        />
         Sign Out
       </button>
     </div>
-
   </div>
 </template>

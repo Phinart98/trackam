@@ -2,13 +2,28 @@ import { defineStore } from 'pinia'
 import type { UserProfile } from '~/types'
 import { getAuthToken } from '~/composables/useAuthToken'
 
+/** Maps the backend BusinessProfile response to the frontend UserProfile shape. */
+function mapServerProfile(
+  server: Record<string, unknown>,
+  fallback: { name: string, email: string }
+): UserProfile {
+  return {
+    name: (server.ownerName as string) || fallback.name,
+    email: fallback.email,
+    currency: (server.currency as string) || 'GHS',
+    businessType: (server.businessType as string) || '',
+    monthlyBudget: server.monthlyBudget as number | undefined,
+    onboarded: server.onboarded === true
+  }
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     profile: null as UserProfile | null,
     isLoggedIn: false,
     authError: null as string | null,
     _listenerAttached: false,
-    _unsubscribeAuth: null as (() => void) | null,
+    _unsubscribeAuth: null as (() => void) | null
   }),
 
   getters: {
@@ -28,27 +43,38 @@ export const useAuthStore = defineStore('auth', {
 
       const supabase = useSupabase()
 
-      // Check for existing session
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
         this.isLoggedIn = true
         if (!this.profile) {
           const meta = session.user.user_metadata ?? {}
-          this.profile = {
+          const fallback = {
             name: (meta.name as string) || session.user.email?.split('@')[0] || 'User',
-            email: session.user.email || '',
-            currency: 'GHS',
-            businessType: '',
-            onboarded: false
+            email: session.user.email || ''
+          }
+          // Set immediate fallback profile so the UI isn't blocked
+          this.profile = { ...fallback, currency: 'GHS', businessType: '', onboarded: false }
+
+          // Fetch real profile from backend in background (non-blocking)
+          const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
+          if (apiBase) {
+            getAuthToken().then((token) => {
+              if (!token) return
+              $fetch<Record<string, unknown>>(`${apiBase}/api/profile`, {
+                headers: { Authorization: `Bearer ${token}` }
+              }).then((server) => {
+                if (server && this.profile) {
+                  this.profile = mapServerProfile(server, fallback)
+                }
+              }).catch(() => { /* backend unreachable — keep fallback */ })
+            })
           }
         }
       } else {
-        // No valid session — clear stale persisted state
         this.isLoggedIn = false
         this.profile = null
       }
 
-      // Listen for auth state changes (sign in, sign out, token refresh)
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session) {
           this.isLoggedIn = true
@@ -65,7 +91,6 @@ export const useAuthStore = defineStore('auth', {
       this.authError = null
 
       if (!this.useRealAuth) {
-        // Mock mode for demo without Supabase
         await new Promise(resolve => setTimeout(resolve, 600))
         const name = email.split('@')[0] ?? 'User'
         this.isLoggedIn = true
@@ -91,34 +116,36 @@ export const useAuthStore = defineStore('auth', {
 
       this.isLoggedIn = true
 
-      // Use server-returned user_metadata — authoritative source for name and onboarded state
       const meta = user?.user_metadata ?? {}
+      const fallback: UserProfile = {
+        name: (meta.name as string) || email.split('@')[0] || 'User',
+        email: user?.email || email,
+        currency: 'GHS',
+        businessType: '',
+        onboarded: false
+      }
+
       const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
       if (apiBase) {
         try {
           const token = await getAuthToken()
-          const serverProfile = await $fetch<UserProfile>(`${apiBase}/api/profile`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {}
-          })
-          this.profile = serverProfile
+          // Race the fetch against a 3-second timeout to avoid blocking on cold starts
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 3000)
+          )
+          const server = await Promise.race([
+            $fetch<Record<string, unknown>>(`${apiBase}/api/profile`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {}
+            }),
+            timeout
+          ])
+          this.profile = mapServerProfile(server, { name: fallback.name, email: fallback.email })
         } catch {
-          // Backend not yet reachable — fall back to metadata
-          this.profile = {
-            name: (meta.name as string) || email.split('@')[0] || 'User',
-            email,
-            currency: 'GHS',
-            businessType: '',
-            onboarded: false
-          }
+          // Cold start timeout or network error — use metadata fallback
+          this.profile = fallback
         }
       } else {
-        this.profile = {
-          name: (meta.name as string) || email.split('@')[0] || 'User',
-          email,
-          currency: 'GHS',
-          businessType: '',
-          onboarded: false
-        }
+        this.profile = fallback
       }
     },
 
@@ -137,7 +164,8 @@ export const useAuthStore = defineStore('auth', {
         email,
         password,
         options: {
-          data: { name: name || email.split('@')[0] }
+          data: { name: name || email.split('@')[0] },
+          emailRedirectTo: `${window.location.origin}/login`
         }
       })
 
@@ -180,7 +208,14 @@ export const useAuthStore = defineStore('auth', {
         await $fetch(`${apiBase}/api/profile`, {
           method: 'POST',
           headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: this.profile
+          body: {
+            ownerName: this.profile.name,
+            businessName: this.profile.businessType,
+            businessType: this.profile.businessType,
+            currency: this.profile.currency,
+            monthlyBudget: this.profile.monthlyBudget,
+            onboarded: this.profile.onboarded
+          }
         })
       } catch {
         // Non-critical — profile is still saved locally in Pinia
@@ -202,7 +237,6 @@ export const useAuthStore = defineStore('auth', {
       this.isLoggedIn = false
       this.profile = null
 
-      // Clear all user data from other stores
       useTransactionStore().$reset()
       useGoalStore().$reset()
       useCategoryStore().$reset()

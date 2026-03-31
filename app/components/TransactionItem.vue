@@ -49,7 +49,10 @@ const sourceLabel = computed(() => {
       </p>
       <div class="flex items-center gap-1.5 mt-0.5">
         <span class="text-xs text-slate-400">{{ formatRelativeTime(transaction.date) }}</span>
-        <span v-if="transaction.vendor && !compact" class="text-xs text-slate-400">· {{ transaction.vendor }}</span>
+        <span
+          v-if="transaction.vendor && !compact"
+          class="text-xs text-slate-400"
+        >· {{ transaction.vendor }}</span>
         <span
           v-if="transaction.source !== 'manual' && !compact"
           class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600"
