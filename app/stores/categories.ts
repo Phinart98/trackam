@@ -1,4 +1,3 @@
-import { defineStore } from 'pinia'
 import type { Category } from '~/types'
 import { DEFAULT_CATEGORIES } from '~/utils/categories'
 

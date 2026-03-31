@@ -1,4 +1,3 @@
-import { defineStore } from 'pinia'
 import type { Goal } from '~/types'
 
 export const useGoalStore = defineStore('goals', {

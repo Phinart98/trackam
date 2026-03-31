@@ -1,4 +1,3 @@
-import { defineStore } from 'pinia'
 import type { UserProfile } from '~/types'
 import { getAuthToken } from '~/composables/useAuthToken'
 

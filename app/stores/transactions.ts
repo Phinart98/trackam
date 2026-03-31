@@ -1,4 +1,3 @@
-import { defineStore } from 'pinia'
 import type { Transaction } from '~/types'
 import { calculateBurnRate, trendDirection } from '~/utils/forecasting'
 

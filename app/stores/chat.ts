@@ -1,4 +1,3 @@
-import { defineStore } from 'pinia'
 import type { ChatMessage } from '~/types'
 
 export const useChatStore = defineStore('chat', {
