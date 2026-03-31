@@ -60,6 +60,8 @@ onUnmounted(() => {
   if (saveTimer) clearTimeout(saveTimer)
 })
 
+const showCurrencyPicker = ref(false)
+
 // ── Danger zone ───────────────────────────────────────────────────────────────
 const { confirm } = useConfirm()
 
@@ -255,18 +257,35 @@ function logout() {
         <!-- Currency -->
         <div class="px-4 py-3.5">
           <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-2">Currency</label>
-          <select
-            v-model="selectedCurrency"
-            class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-emerald-400"
-          >
-            <option
-              v-for="c in SUPPORTED_CURRENCIES"
-              :key="c.code"
-              :value="c.code"
+          <!-- Custom dropdown: native <select> strips emoji on desktop browsers -->
+          <div class="relative">
+            <button
+              type="button"
+              class="w-full flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-emerald-400 text-left"
+              @click="showCurrencyPicker = !showCurrencyPicker"
             >
-              {{ c.flag }} {{ c.label }} ({{ c.symbol }})
-            </option>
-          </select>
+              <span class="text-base">{{ SUPPORTED_CURRENCIES.find(c => c.code === selectedCurrency)?.flag }}</span>
+              <span class="flex-1">{{ SUPPORTED_CURRENCIES.find(c => c.code === selectedCurrency)?.label }}</span>
+              <UIcon name="i-lucide-chevron-down" class="text-slate-400 text-sm shrink-0" :class="showCurrencyPicker ? 'rotate-180' : ''" />
+            </button>
+            <div
+              v-if="showCurrencyPicker"
+              class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto"
+            >
+              <button
+                v-for="c in SUPPORTED_CURRENCIES"
+                :key="c.code"
+                type="button"
+                class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 text-left transition-colors"
+                :class="selectedCurrency === c.code ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-800'"
+                @click="selectedCurrency = c.code; showCurrencyPicker = false"
+              >
+                <span class="text-base">{{ c.flag }}</span>
+                <span class="flex-1">{{ c.label }}</span>
+                <span class="text-slate-400 text-xs">{{ c.symbol }}</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Monthly budget -->

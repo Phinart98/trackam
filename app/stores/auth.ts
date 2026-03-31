@@ -128,12 +128,17 @@ export const useAuthStore = defineStore('auth', {
       this.isLoggedIn = true
 
       const meta = user?.user_metadata ?? {}
+      const userEmail = user?.email || email
+      // For returning users, Pinia persist already has the correct profile in
+      // localStorage (including onboarded:true). Use it as the cold-start fallback
+      // so a backend timeout never resets onboarding for a returning user.
+      const persisted = this.profile?.email === userEmail ? this.profile : null
       const fallback: UserProfile = {
         name: (meta.name as string) || email.split('@')[0] || 'User',
-        email: user?.email || email,
-        currency: 'GHS',
-        businessType: '',
-        onboarded: false
+        email: userEmail,
+        currency: persisted?.currency || 'GHS',
+        businessType: persisted?.businessType || '',
+        onboarded: persisted?.onboarded ?? false
       }
 
       const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
@@ -152,7 +157,7 @@ export const useAuthStore = defineStore('auth', {
           ])
           this.profile = mapServerProfile(server, { name: fallback.name, email: fallback.email })
         } catch {
-          // Cold start timeout or network error — use metadata fallback
+          // Cold start timeout — fall back to persisted profile (preserves onboarded state)
           this.profile = fallback
         }
       } else {

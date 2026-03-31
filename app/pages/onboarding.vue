@@ -18,37 +18,15 @@ const resolvedBusinessType = computed(() =>
     : selectedBusinessType.value
 )
 
-async function finish() {
+function finish() {
   auth.completeOnboarding(
     selectedCurrency.value,
     resolvedBusinessType.value,
     monthlyBudget.value ? parseFloat(monthlyBudget.value) : undefined
   )
-
-  // Sync profile to backend if available
-  const config = useRuntimeConfig()
-  const apiBaseUrl = config.public.apiBaseUrl as string
-  if (apiBaseUrl) {
-    try {
-      const token = await getAuthToken()
-      const budget = monthlyBudget.value ? parseFloat(monthlyBudget.value) : undefined
-      await $fetch(`${apiBaseUrl}/api/profile`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: {
-          ownerName: auth.profile?.name,
-          businessName: resolvedBusinessType.value,
-          businessType: resolvedBusinessType.value,
-          currency: selectedCurrency.value,
-          monthlyBudget: budget,
-          onboarded: true
-        }
-      })
-    } catch (err) {
-      console.warn('Failed to sync profile to backend:', err)
-    }
-  }
-
+  // Fire-and-forget — saveProfile reads from the updated auth.profile.
+  // Do NOT await: that's what caused the slow "Let's Go" (backend cold start blocking nav).
+  auth.saveProfile()
   navigateTo('/dashboard')
 }
 </script>
