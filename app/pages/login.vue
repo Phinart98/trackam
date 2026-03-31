@@ -15,6 +15,28 @@ const showPassword = ref(false)
 
 const isSignIn = computed(() => tab.value === 'signin')
 
+// When user arrives via the email confirmation link, Supabase processes the
+// URL hash/code and establishes a session automatically. Detect that here and
+// redirect instead of making the user manually sign in again.
+onMounted(async () => {
+  if (!auth.useRealAuth) return
+  const supabase = useSupabase()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return
+  auth.isLoggedIn = true
+  if (!auth.profile) {
+    const meta = session.user.user_metadata ?? {}
+    auth.profile = {
+      name: (meta.name as string) || session.user.email?.split('@')[0] || 'User',
+      email: session.user.email || '',
+      currency: 'GHS',
+      businessType: '',
+      onboarded: false
+    }
+  }
+  router.push(auth.profile?.onboarded ? '/dashboard' : '/onboarding')
+})
+
 async function submit() {
   if (!email.value || !password.value) return
   loading.value = true

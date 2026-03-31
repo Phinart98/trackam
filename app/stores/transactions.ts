@@ -126,11 +126,9 @@ export const useTransactionStore = defineStore('transactions', {
         })
         this.transactions = data
       } catch (err) {
-        if ((err as { statusCode?: number })?.statusCode === 401) {
-          await useAuthStore().logout()
-          await navigateTo('/login')
-          return
-        }
+        // Do not auto-logout on 401 — a token failure (cold start race, network blip)
+        // should not blow away the user's Supabase session. The onAuthStateChange
+        // listener in the auth store handles genuine sign-out events.
         console.warn('Failed to fetch transactions from API:', err)
       } finally {
         this.loading = false

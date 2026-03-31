@@ -77,6 +77,18 @@ export const useAuthStore = defineStore('auth', {
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session) {
           this.isLoggedIn = true
+          // If no profile yet (e.g. arriving via email confirmation link before
+          // login() is called), set a fallback so the app isn't stuck in limbo.
+          if (!this.profile) {
+            const meta = session.user.user_metadata ?? {}
+            this.profile = {
+              name: (meta.name as string) || session.user.email?.split('@')[0] || 'User',
+              email: session.user.email || '',
+              currency: 'GHS',
+              businessType: '',
+              onboarded: false
+            }
+          }
         } else if (event === 'SIGNED_OUT') {
           this.isLoggedIn = false
           this.profile = null
