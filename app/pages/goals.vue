@@ -48,7 +48,7 @@ function startEdit(goal: { id: string, name: string, icon: string, color: string
   showForm.value = true
 }
 
-function handleSave() {
+async function handleSave() {
   const name = formName.value.trim()
   const target = parseFloat(formTarget.value)
   if (!name || !target || target <= 0) return
@@ -65,10 +65,10 @@ function handleSave() {
   }
 
   if (isEditing.value) {
-    goalStore.updateGoal(editingId.value!, base)
+    await goalStore.updateGoal(editingId.value!, base)
     toast.add({ title: 'Goal updated', color: 'success' })
   } else {
-    goalStore.addGoal({ ...base, currentAmount: 0 })
+    await goalStore.addGoal({ ...base, currentAmount: 0 })
     toast.add({ title: 'Goal created! Start saving.', color: 'success' })
   }
   resetForm()
@@ -80,15 +80,15 @@ function openFunds(goalId: string, adding: boolean) {
   fundAmount.value = ''
 }
 
-function handleAddFunds() {
+async function handleAddFunds() {
   const amount = parseFloat(fundAmount.value)
   if (!fundingGoalId.value || !amount || amount <= 0) return
 
   if (!isAdding.value) {
-    goalStore.removeFunds(fundingGoalId.value, amount)
+    await goalStore.removeFunds(fundingGoalId.value, amount)
     toast.add({ title: `Withdrew ${formatCurrency(amount, auth.currency)}`, color: 'neutral' })
   } else {
-    const capped = goalStore.addFunds(fundingGoalId.value, amount)
+    const capped = await goalStore.addFunds(fundingGoalId.value, amount)
     toast.add(capped
       ? { title: 'Goal reached! Congratulations! 🎉', color: 'success' }
       : { title: `Added ${formatCurrency(amount, auth.currency)}`, color: 'success' }
@@ -102,7 +102,7 @@ const { confirm } = useConfirm()
 
 async function handleDelete(id: string) {
   if (!await confirm('Delete this savings goal?')) return
-  goalStore.removeGoal(id)
+  await goalStore.removeGoal(id)
   toast.add({ title: 'Goal removed', color: 'neutral' })
 }
 

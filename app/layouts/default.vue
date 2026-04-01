@@ -2,6 +2,7 @@
 const auth = useAuthStore()
 const tx = useTransactionStore()
 const catStore = useCategoryStore()
+const goalStore = useGoalStore()
 
 // Await init so session state is resolved before checking isLoggedIn
 await auth.init()
@@ -14,6 +15,7 @@ watch(() => auth.isLoggedIn, (loggedIn) => {
     if (apiBase) {
       tx.fetchFromApi(apiBase)
       catStore.fetchFromApi()
+      goalStore.loadGoals()
     } else {
       tx.loadTransactions()
     }
