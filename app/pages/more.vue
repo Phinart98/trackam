@@ -70,6 +70,23 @@ async function confirmClearData() {
     message: 'This will delete all transactions and chat history. This cannot be undone.',
     confirmLabel: 'Clear Data'
   })) return
+
+  const config = useRuntimeConfig()
+  const apiBaseUrl = config.public.apiBaseUrl as string
+  if (apiBaseUrl) {
+    try {
+      const token = await getAuthToken()
+      await $fetch(`${apiBaseUrl}/api/user/data`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
+    } catch (err) {
+      console.warn('Failed to delete data from backend:', err)
+      toast.add({ title: 'Could not clear server data', color: 'error' })
+      return
+    }
+  }
+
   tx.$reset()
   chat.clearChat()
   toast.add({ title: 'Data cleared', color: 'neutral' })

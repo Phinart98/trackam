@@ -6,7 +6,7 @@ export interface Transaction {
   category: string
   description: string
   date: string
-  source: 'manual' | 'ai-text' | 'ai-image' | 'ai-voice'
+  source: 'manual' | 'ai-text' | 'ai-image'
   confidence?: number
   vendor?: string
 }

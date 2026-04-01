@@ -172,15 +172,16 @@ export const useTransactionStore = defineStore('transactions', {
             headers: token ? { Authorization: `Bearer ${token}` } : {}
           })
         } catch (err: unknown) {
-          // Only remove locally if API returned 404 (already deleted)
+          // Only remove locally if API returned 404 (already deleted remotely)
           if ((err as { statusCode?: number })?.statusCode !== 404) {
             console.warn('Failed to delete from API:', err)
             return
           }
         }
+        this.transactions = this.transactions.filter(t => t.id !== id)
+      } else {
+        this.transactions = this.transactions.filter(t => t.id !== id)
       }
-
-      this.transactions = this.transactions.filter(t => t.id !== id)
     },
 
     setChartRange(range: ChartRange) {

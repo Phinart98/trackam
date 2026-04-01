@@ -9,6 +9,8 @@ const isThinking = ref(false)
 const isStreaming = ref(false)
 const streamingId = ref<string | null>(null)
 const messagesEl = ref<HTMLElement | null>(null)
+let cancelled = false
+onUnmounted(() => { cancelled = true })
 
 const suggestions = [
   'How am I doing this month?',
@@ -22,6 +24,7 @@ async function streamText(msgId: string, fullText: string) {
   streamingId.value = msgId
   const charDelay = Math.max(8, Math.min(25, 1200 / fullText.length))
   for (let i = 1; i <= fullText.length; i++) {
+    if (cancelled) return
     chat.updateMessageContent(msgId, fullText.slice(0, i))
     if (i % 3 === 0) scrollToBottom()
     await new Promise(r => setTimeout(r, charDelay))

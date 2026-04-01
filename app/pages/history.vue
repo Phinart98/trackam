@@ -58,9 +58,9 @@ const grouped = computed(() => {
 })
 
 const counts = computed(() => ({
-  all: tx.sorted.length,
-  income: tx.sorted.filter(t => t.type === 'income').length,
-  expense: tx.sorted.filter(t => t.type === 'expense').length
+  all: tx.transactions.length,
+  income: tx.transactions.filter(t => t.type === 'income').length,
+  expense: tx.transactions.filter(t => t.type === 'expense').length
 }))
 
 function loadMore() {
@@ -82,8 +82,9 @@ onMounted(() => {
   if (sentinel.value) observer.observe(sentinel.value)
 })
 
-// Re-attach observer after sentinel mounts (it only renders when there's more to load)
-watch(sentinel, (el) => {
+// Re-attach observer when sentinel remounts (v-if toggles with hasMore)
+watch(sentinel, (el, oldEl) => {
+  if (oldEl && observer) observer.unobserve(oldEl)
   if (el && observer) observer.observe(el)
 })
 

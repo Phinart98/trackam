@@ -32,7 +32,8 @@ function startEdit(cat: { id: string, name: string, icon: string, dotColor: stri
   formName.value = cat.name
   formType.value = cat.type
   formIcon.value = cat.icon
-  formColorIdx.value = COLOR_PRESETS.findIndex(c => c.dotColor === cat.dotColor) || 0
+  const colorIdx = COLOR_PRESETS.findIndex(c => c.dotColor === cat.dotColor)
+  formColorIdx.value = colorIdx !== -1 ? colorIdx : 0
   formKeywords.value = (cat.keywords ?? []).join(', ')
   showForm.value = true
 }

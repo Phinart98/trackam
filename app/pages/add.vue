@@ -137,8 +137,6 @@ const today = new Date().toISOString().slice(0, 10)
 
 const confidenceColor = (score: number) =>
   score >= 90 ? 'text-green-600' : score >= 80 ? 'text-yellow-600' : 'text-red-500'
-const _confidenceBg = (score: number) =>
-  score >= 90 ? 'bg-green-50' : score >= 80 ? 'bg-yellow-50' : 'bg-red-50'
 </script>
 
 <template>
