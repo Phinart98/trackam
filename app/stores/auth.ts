@@ -52,13 +52,11 @@ export const useAuthStore = defineStore('auth', {
             name: (meta.name as string) || userEmail.split('@')[0] || 'User',
             email: userEmail
           }
-          // Use persisted profile if it matches this user (preserves onboarded: true for returning users)
-          const persisted = this.profile?.email === userEmail ? this.profile : null
           this.profile = {
             ...fallback,
-            currency: persisted?.currency || 'GHS',
-            businessType: persisted?.businessType || '',
-            onboarded: persisted?.onboarded ?? false
+            currency: 'GHS',
+            businessType: '',
+            onboarded: false
           }
 
           // Blocking fetch with 3s timeout — same pattern as login() — so middleware sees correct onboarded state

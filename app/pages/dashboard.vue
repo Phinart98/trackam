@@ -47,10 +47,10 @@ async function refreshInsightIfStale() {
 
 const ranges = ['1W', '1M', '3M', '6M'] as const
 
-// Animated counter — counts from 0 to target over ~1.2s
-const displayBalance = ref(0)
-const displayIncome = ref(0)
-const displayExpenses = ref(0)
+// Animated counter — initialize from store so Pinia-persisted data shows immediately on first render
+const displayBalance = ref(tx.balance)
+const displayIncome = ref(tx.totalIncome)
+const displayExpenses = ref(tx.totalExpenses)
 
 function animateCounter(target: number, setter: (v: number) => void, duration = 1200) {
   const start = performance.now()
@@ -78,6 +78,7 @@ watch(
     displayBalance.value = b
     displayIncome.value = i
     displayExpenses.value = e
+    refreshInsightIfStale()
   }
 )
 

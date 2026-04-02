@@ -32,6 +32,7 @@ function startConfidenceAnimation(target: number, counter: Ref<number>): ReturnT
 const textInput = ref('')
 const isParsing = ref(false)
 const parsedResult = ref<ParsedTransaction | null>(null)
+const parsedDateEdit = ref('')
 const displayedConfidence = ref(0)
 let textConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
@@ -42,6 +43,7 @@ async function handleParseText() {
   try {
     const result = await parseText(textInput.value)
     parsedResult.value = result
+    parsedDateEdit.value = result.date.slice(0, 10)
     if (textConfidenceTimer) clearInterval(textConfidenceTimer)
     textConfidenceTimer = startConfidenceAnimation(result.confidence, displayedConfidence)
   } catch {
@@ -57,6 +59,7 @@ const selectedFile = ref<File | null>(null)
 const previewUrl = ref<string | null>(null)
 const isScanning = ref(false)
 const scanResult = ref<ParsedTransaction | null>(null)
+const scanDateEdit = ref('')
 const scanConfidence = ref(0)
 let scanConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
@@ -81,6 +84,7 @@ async function handleScan(file: File) {
   try {
     const result = await parseImage(file)
     scanResult.value = result
+    scanDateEdit.value = result.date.slice(0, 10)
     if (scanConfidenceTimer) clearInterval(scanConfidenceTimer)
     scanConfidenceTimer = startConfidenceAnimation(result.confidence, scanConfidence)
   } catch {
@@ -101,14 +105,14 @@ const manualCategories = computed(() =>
 )
 
 // --- Save helpers ---
-async function saveTransaction(result: ParsedTransaction, source: 'ai-text' | 'ai-image' | 'manual') {
+async function saveTransaction(result: ParsedTransaction, source: 'ai-text' | 'ai-image' | 'manual', dateOverride?: string) {
   await tx.saveTransaction({
     type: result.type,
     amount: result.amount,
     currency: auth.currency,
     category: result.category,
     description: result.description,
-    date: result.date,
+    date: dateOverride || result.date,
     source,
     confidence: result.confidence,
     vendor: result.vendor
@@ -267,6 +271,20 @@ const confidenceColor = (score: number) =>
             </span>
           </div>
 
+          <!-- Editable date — lets user catch/correct AI date errors before saving -->
+          <div class="flex items-center gap-2">
+            <UIcon
+              name="i-lucide-calendar"
+              class="text-slate-400 text-sm shrink-0"
+            />
+            <input
+              v-model="parsedDateEdit"
+              type="date"
+              :max="today"
+              class="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-emerald-400"
+            >
+          </div>
+
           <!-- Confidence -->
           <div>
             <div class="flex items-center justify-between mb-1">
@@ -289,7 +307,7 @@ const confidenceColor = (score: number) =>
 
           <button
             class="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all"
-            @click="saveTransaction(parsedResult!, 'ai-text')"
+            @click="saveTransaction(parsedResult!, 'ai-text', parsedDateEdit)"
           >
             Confirm & Save
           </button>
@@ -389,6 +407,20 @@ const confidenceColor = (score: number) =>
             </span>
           </div>
 
+          <!-- Editable date — lets user correct AI-extracted receipt date before saving -->
+          <div class="flex items-center gap-2">
+            <UIcon
+              name="i-lucide-calendar"
+              class="text-slate-400 text-sm shrink-0"
+            />
+            <input
+              v-model="scanDateEdit"
+              type="date"
+              :max="today"
+              class="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-emerald-400"
+            >
+          </div>
+
           <div>
             <div class="flex items-center justify-between mb-1">
               <span class="text-xs text-slate-500">AI Confidence</span>
@@ -410,7 +442,7 @@ const confidenceColor = (score: number) =>
 
           <button
             class="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all"
-            @click="saveTransaction(scanResult!, 'ai-image')"
+            @click="saveTransaction(scanResult!, 'ai-image', scanDateEdit)"
           >
             Confirm & Save
           </button>

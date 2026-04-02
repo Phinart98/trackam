@@ -283,7 +283,11 @@ function logout() {
             >
               <span class="text-base">{{ SUPPORTED_CURRENCIES.find(c => c.code === selectedCurrency)?.flag }}</span>
               <span class="flex-1">{{ SUPPORTED_CURRENCIES.find(c => c.code === selectedCurrency)?.label }}</span>
-              <UIcon name="i-lucide-chevron-down" class="text-slate-400 text-sm shrink-0" :class="showCurrencyPicker ? 'rotate-180' : ''" />
+              <UIcon
+                name="i-lucide-chevron-down"
+                class="text-slate-400 text-sm shrink-0"
+                :class="showCurrencyPicker ? 'rotate-180' : ''"
+              />
             </button>
             <div
               v-if="showCurrencyPicker"
