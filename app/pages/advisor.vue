@@ -10,7 +10,9 @@ const isStreaming = ref(false)
 const streamingId = ref<string | null>(null)
 const messagesEl = ref<HTMLElement | null>(null)
 let cancelled = false
-onUnmounted(() => { cancelled = true })
+onUnmounted(() => {
+  cancelled = true
+})
 
 const suggestions = [
   'How am I doing this month?',
