@@ -251,6 +251,22 @@ const confidenceColor = (score: number) =>
             </span>
           </div>
 
+          <!-- FX conversion indicator -->
+          <div
+            v-if="parsedResult.originalCurrency && parsedResult.originalAmount"
+            class="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg"
+          >
+            <UIcon
+              name="i-lucide-arrow-right-left"
+              class="text-blue-500 text-sm shrink-0"
+            />
+            <span class="text-xs text-blue-700">
+              {{ formatCurrency(parsedResult.originalAmount!, parsedResult.originalCurrency) }}
+              → {{ formatCurrency(parsedResult.amount, auth.currency) }}
+              <span class="text-blue-400 ml-1">@ {{ parsedResult.exchangeRate?.toFixed(4) }}</span>
+            </span>
+          </div>
+
           <!-- Confidence -->
           <div>
             <div class="flex items-center justify-between mb-1">

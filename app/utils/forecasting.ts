@@ -76,10 +76,12 @@ export function calculateBurnRate(transactions: Transaction[], monthlyBudget: nu
     else totalIncome += t.amount
   }
 
-  const dailyAverage = totalExpenses / Math.max(dayOfMonth, 1)
+  // Use at least 7 days as sample size to avoid absurd projections in the first week of the month
+  const effectiveDays = Math.max(dayOfMonth, 7)
+  const dailyAverage = totalExpenses / effectiveDays
   // Scale daily average to full month — avoids double-counting today
   const projectedMonthTotal = dailyAverage * daysInMonth
-  const projectedIncome = (totalIncome / Math.max(dayOfMonth, 1)) * daysInMonth
+  const projectedIncome = (totalIncome / effectiveDays) * daysInMonth
   const projectedEndBalance = projectedIncome - projectedMonthTotal
 
   const budget = monthlyBudget || projectedIncome || 1

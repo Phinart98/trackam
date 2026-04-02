@@ -47,26 +47,42 @@ export const useAuthStore = defineStore('auth', {
         this.isLoggedIn = true
         if (!this.profile) {
           const meta = session.user.user_metadata ?? {}
+          const userEmail = session.user.email || ''
           const fallback = {
-            name: (meta.name as string) || session.user.email?.split('@')[0] || 'User',
-            email: session.user.email || ''
+            name: (meta.name as string) || userEmail.split('@')[0] || 'User',
+            email: userEmail
           }
-          // Set immediate fallback profile so the UI isn't blocked
-          this.profile = { ...fallback, currency: 'GHS', businessType: '', onboarded: false }
+          // Use persisted profile if it matches this user (preserves onboarded: true for returning users)
+          const persisted = this.profile?.email === userEmail ? this.profile : null
+          this.profile = {
+            ...fallback,
+            currency: persisted?.currency || 'GHS',
+            businessType: persisted?.businessType || '',
+            onboarded: persisted?.onboarded ?? false
+          }
 
-          // Fetch real profile from backend in background (non-blocking)
+          // Blocking fetch with 3s timeout — same pattern as login() — so middleware sees correct onboarded state
           const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
           if (apiBase) {
-            getAuthToken().then((token) => {
-              if (!token) return
-              $fetch<Record<string, unknown>>(`${apiBase}/api/profile`, {
-                headers: { Authorization: `Bearer ${token}` }
-              }).then((server) => {
-                if (server && this.profile) {
+            try {
+              const token = await getAuthToken()
+              if (token) {
+                const timeout = new Promise<never>((_, reject) =>
+                  setTimeout(() => reject(new Error('timeout')), 3000)
+                )
+                const server = await Promise.race([
+                  $fetch<Record<string, unknown>>(`${apiBase}/api/profile`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                  }),
+                  timeout
+                ])
+                if (server) {
                   this.profile = mapServerProfile(server, fallback)
                 }
-              }).catch(() => { /* backend unreachable — keep fallback */ })
-            })
+              }
+            } catch {
+              // timeout or unreachable — keep fallback (persisted profile preserves onboarded)
+            }
           }
         }
       } else {
