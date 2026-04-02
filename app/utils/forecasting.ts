@@ -100,7 +100,8 @@ export function calculateBurnRate(transactions: Transaction[], monthlyBudget: nu
   // Blend weight: ramps from 0 (pure historical) on day 1 to 1 (pure current) by day 14
   // Matches industry practice (Copilot/Rocket Money) of anchoring to history early in the month
   const blendWeight = Math.min(dayOfMonth / 14, 1)
-  const effectiveDays = Math.max(dayOfMonth, 1)
+  // No history → keep 7-day floor to prevent day-1 explosion; with history the blend handles it
+  const effectiveDays = recentMonths.length === 0 ? Math.max(dayOfMonth, 7) : Math.max(dayOfMonth, 1)
   const currentPaceExpenses = (totalExpenses / effectiveDays) * daysInMonth
   const currentPaceIncome = (totalIncome / effectiveDays) * daysInMonth
 
