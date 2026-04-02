@@ -76,12 +76,42 @@ export function calculateBurnRate(transactions: Transaction[], monthlyBudget: nu
     else totalIncome += t.amount
   }
 
-  // Use at least 7 days as sample size to avoid absurd projections in the first week of the month
-  const effectiveDays = Math.max(dayOfMonth, 7)
-  const dailyAverage = totalExpenses / effectiveDays
-  // Scale daily average to full month — avoids double-counting today
-  const projectedMonthTotal = dailyAverage * daysInMonth
-  const projectedIncome = (totalIncome / effectiveDays) * daysInMonth
+  // Historical 3-month average (prior months only) — anchor for early-month projections
+  const priorMonths: Map<string, { expenses: number, income: number }> = new Map()
+  for (const t of transactions) {
+    const prefix = t.date.slice(0, 7)
+    if (prefix >= monthPrefix) continue
+    if (!priorMonths.has(prefix)) priorMonths.set(prefix, { expenses: 0, income: 0 })
+    const b = priorMonths.get(prefix)!
+    if (t.type === 'expense') b.expenses += t.amount
+    else b.income += t.amount
+  }
+  const recentMonths = [...priorMonths.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, 3)
+    .map(([, v]) => v)
+  const histExpenses = recentMonths.length > 0
+    ? recentMonths.reduce((s, m) => s + m.expenses, 0) / recentMonths.length
+    : null
+  const histIncome = recentMonths.length > 0
+    ? recentMonths.reduce((s, m) => s + m.income, 0) / recentMonths.length
+    : null
+
+  // Blend weight: ramps from 0 (pure historical) on day 1 to 1 (pure current) by day 14
+  // Matches industry practice (Copilot/Rocket Money) of anchoring to history early in the month
+  const blendWeight = Math.min(dayOfMonth / 14, 1)
+  const effectiveDays = Math.max(dayOfMonth, 1)
+  const currentPaceExpenses = (totalExpenses / effectiveDays) * daysInMonth
+  const currentPaceIncome = (totalIncome / effectiveDays) * daysInMonth
+
+  const projectedMonthTotal = histExpenses !== null
+    ? (1 - blendWeight) * histExpenses + blendWeight * currentPaceExpenses
+    : currentPaceExpenses
+  const projectedIncome = histIncome !== null
+    ? (1 - blendWeight) * histIncome + blendWeight * currentPaceIncome
+    : currentPaceIncome
+
+  const dailyAverage = projectedMonthTotal / daysInMonth
   const projectedEndBalance = projectedIncome - projectedMonthTotal
 
   const budget = monthlyBudget || projectedIncome || 1
