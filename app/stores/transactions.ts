@@ -127,9 +127,15 @@ export const useTransactionStore = defineStore('transactions', {
       this.loading = true
       try {
         const token = await getAuthToken()
-        const data = await $fetch<Transaction[]>(`${apiBaseUrl}/api/transactions`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        })
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 8000)
+        )
+        const data = await Promise.race([
+          $fetch<Transaction[]>(`${apiBaseUrl}/api/transactions`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          }),
+          timeout
+        ])
         this.transactions = data
       } catch (err) {
         // Do not auto-logout on 401 — a token failure (cold start race, network blip)

@@ -14,6 +14,7 @@ const SIX_HOURS = 6 * 60 * 60 * 1000
 
 async function forceRefreshInsight() {
   tx.aiInsightAt = 0
+  insightLoading.value = false  // unblock if a previous fetch got stuck
   await refreshInsightIfStale()
 }
 

@@ -75,20 +75,20 @@ async function changeCurrency(newCode: string) {
     )
     if (doConvert) {
       try {
-        // Optimistic update — revert on failure
+        // Optimistic update — save immediately (debounced save gets cancelled on unmount)
         selectedCurrency.value = newCode
-        scheduleProfileSave()
+        await auth.saveProfile()
         const token = await getAuthToken()
         await $fetch(`${apiBase}/api/transactions/convert-currency?from=${oldCode}&to=${newCode}`, {
           method: 'POST',
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         })
         await tx.fetchFromApi(apiBase)
+        tx.aiInsightAt = 0  // force dashboard insight to reflect new currency
         toast.add({ title: `Amounts converted to ${newCode}`, color: 'success' })
       } catch {
         selectedCurrency.value = oldCode
-        if (saveTimer) clearTimeout(saveTimer)
-        scheduleProfileSave()
+        await auth.saveProfile()
         toast.add({ title: 'Conversion failed', description: 'Amounts were not converted. Try again.', color: 'error' })
       }
       return
@@ -97,7 +97,7 @@ async function changeCurrency(newCode: string) {
 
   // No conversion needed (or user declined) — just update currency
   selectedCurrency.value = newCode
-  scheduleProfileSave()
+  await auth.saveProfile()
 }
 
 const showCurrencyPicker = ref(false)
