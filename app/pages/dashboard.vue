@@ -7,6 +7,7 @@ const auth = useAuthStore()
 const tx = useTransactionStore()
 const goalStore = useGoalStore()
 const { generateInsight } = useAI()
+const toast = useToast()
 
 const insightLoading = ref(false)
 
@@ -15,10 +16,10 @@ const SIX_HOURS = 6 * 60 * 60 * 1000
 async function forceRefreshInsight() {
   tx.aiInsightAt = 0
   insightLoading.value = false // unblock if a previous fetch got stuck
-  await refreshInsightIfStale()
+  await refreshInsightIfStale(true)
 }
 
-async function refreshInsightIfStale() {
+async function refreshInsightIfStale(force = false) {
   if (insightLoading.value || tx.transactions.length === 0) return
   const stale = Date.now() - tx.aiInsightAt > SIX_HOURS
   const txCountChanged = tx.transactions.length !== tx.aiInsightTxCount
@@ -45,6 +46,7 @@ async function refreshInsightIfStale() {
     tx.aiInsightAt = Date.now()
     tx.aiInsightTxCount = tx.transactions.length
   } catch {
+    if (force) toast.add({ title: 'Could not refresh insight', description: 'AI providers are busy — try again in a moment.', color: 'warning' })
     // keep showing last cached insight or fallback
   } finally {
     insightLoading.value = false
