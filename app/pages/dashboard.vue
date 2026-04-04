@@ -57,13 +57,13 @@ const displayBalance = ref(tx.balance)
 const displayIncome = ref(tx.totalIncome)
 const displayExpenses = ref(tx.totalExpenses)
 
-function animateCounter(target: number, setter: (v: number) => void, duration = 1200) {
+function animateCounter(from: number, target: number, setter: (v: number) => void, duration = 1200) {
   const start = performance.now()
   function tick(now: number) {
     const elapsed = now - start
     const progress = Math.min(elapsed / duration, 1)
     const eased = 1 - (1 - progress) ** 3 // ease-out cubic
-    setter(Math.round(target * eased))
+    setter(Math.round(from + (target - from) * eased))
     if (progress < 1) requestAnimationFrame(tick)
   }
   requestAnimationFrame(tick)
@@ -80,9 +80,9 @@ onMounted(() => {
 watch(
   () => [tx.balance, tx.totalIncome, tx.totalExpenses] as const,
   ([b, i, e]) => {
-    animateCounter(b, v => (displayBalance.value = v))
-    animateCounter(i, v => (displayIncome.value = v))
-    animateCounter(e, v => (displayExpenses.value = v))
+    animateCounter(displayBalance.value, b, v => (displayBalance.value = v))
+    animateCounter(displayIncome.value, i, v => (displayIncome.value = v))
+    animateCounter(displayExpenses.value, e, v => (displayExpenses.value = v))
     refreshInsightIfStale()
   }
 )

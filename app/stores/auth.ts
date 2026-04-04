@@ -62,9 +62,15 @@ export const useAuthStore = defineStore('auth', {
             onboarded: metaOnboarded
           }
 
+          // Start transaction fetch NOW, concurrent with the profile fetch below.
+          // On session resume (page reload), this runs at the same time as the 5s profile fetch
+          // so data is ready by the time the app mounts. Loading guard prevents duplicates.
+          const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
+          if (apiBase) useTransactionStore().fetchFromApi(apiBase)
+
           // Blocking fetch with 5s timeout to load full profile (currency, businessType, etc.)
           // onboarded routing is already correct from metadata above
-          const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
+          // (apiBase already declared above)
           if (apiBase) {
             try {
               const token = await getAuthToken()
@@ -171,6 +177,9 @@ export const useAuthStore = defineStore('auth', {
       }
 
       const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
+      // Start transaction fetch NOW, concurrent with the profile fetch below.
+      // The layout watch also calls fetchFromApi after mount, but the loading guard makes it a no-op.
+      if (apiBase) useTransactionStore().fetchFromApi(apiBase)
       if (apiBase) {
         try {
           const token = await getAuthToken()

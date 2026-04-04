@@ -123,6 +123,7 @@ export const useTransactionStore = defineStore('transactions', {
 
     /** Fetch all transactions from the backend API. */
     async fetchFromApi(apiBaseUrl: string) {
+      if (this.loading) return // Prevent duplicate concurrent fetches
       this.loading = true
       try {
         const token = await getAuthToken()
