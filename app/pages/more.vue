@@ -4,6 +4,7 @@ import { BUSINESS_TYPES } from '~/utils/categories'
 
 const auth = useAuthStore()
 const tx = useTransactionStore()
+const goalStore = useGoalStore()
 const chat = useChatStore()
 const toast = useToast()
 
@@ -75,20 +76,21 @@ async function changeCurrency(newCode: string) {
     )
     if (doConvert) {
       try {
-        // Optimistic update — save immediately (debounced save gets cancelled on unmount)
-        selectedCurrency.value = newCode
-        await auth.saveProfile()
+        // Convert data first, then save currency — this way a failed conversion
+        // doesn't leave the backend profile showing a currency the data isn't in
         const token = await getAuthToken()
         await $fetch(`${apiBase}/api/transactions/convert-currency?from=${oldCode}&to=${newCode}`, {
           method: 'POST',
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         })
+        selectedCurrency.value = newCode
+        await auth.saveProfile()
         await tx.fetchFromApi(apiBase)
+        await goalStore.loadGoals()
         tx.aiInsightAt = 0  // force dashboard insight to reflect new currency
         toast.add({ title: `Amounts converted to ${newCode}`, color: 'success' })
       } catch {
-        selectedCurrency.value = oldCode
-        await auth.saveProfile()
+        // Conversion failed — data unchanged, no need to revert or re-save
         toast.add({ title: 'Conversion failed', description: 'Amounts were not converted. Try again.', color: 'error' })
       }
       return

@@ -22,6 +22,54 @@ function goalDotColor(goal: { color: string, dotColor?: string }): string {
   return goal.dotColor ?? COLOR_PRESETS.find(p => p.color === goal.color)?.dotColor ?? '#64748b'
 }
 
+// ── Create / Edit form ────────────────────────────────────────────────────────
+function resetForm() {
+  formName.value = ''
+  formTarget.value = ''
+  formIcon.value = 'i-lucide-trending-up'
+  formColorIdx.value = 4
+  formDeadline.value = ''
+  editingId.value = null
+  showForm.value = false
+}
+
+function startEdit(goal: { id: string, name: string, icon: string, color: string, targetAmount: number, deadline?: string }) {
+  editingId.value = goal.id
+  formName.value = goal.name
+  formTarget.value = goal.targetAmount.toString()
+  formIcon.value = goal.icon
+  formDeadline.value = goal.deadline?.slice(0, 10) ?? ''
+  formColorIdx.value = COLOR_PRESETS.findIndex(c => c.color === goal.color)
+  if (formColorIdx.value === -1) formColorIdx.value = 4
+  showForm.value = true
+}
+
+async function handleSave() {
+  const name = formName.value.trim()
+  const target = parseFloat(formTarget.value)
+  if (!name || !target || target <= 0) return
+
+  const base = {
+    name,
+    targetAmount: target,
+    currency: auth.currency,
+    icon: formIcon.value,
+    color: formColor.value.color,
+    bgColor: formColor.value.bgColor,
+    dotColor: formColor.value.dotColor,
+    deadline: formDeadline.value || undefined
+  }
+
+  if (isEditing.value) {
+    await goalStore.updateGoal(editingId.value!, base)
+    toast.add({ title: 'Goal updated', color: 'success' })
+  } else {
+    await goalStore.addGoal({ ...base, currentAmount: 0 })
+    toast.add({ title: 'Goal created! Start saving.', color: 'success' })
+  }
+  resetForm()
+}
+
 // ── Add/withdraw funds modal ──────────────────────────────────────────────────
 const fundingGoalId = ref<string | null>(null)
 const fundAmount = ref('')
