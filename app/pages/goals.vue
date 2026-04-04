@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { COLOR_PRESETS } from '~/stores/categories'
-import { formatCurrency, ringOffset } from '~/utils/formatters'
+import { formatCurrency, getCurrencySymbol, ringOffset } from '~/utils/formatters'
 
 const auth = useAuthStore()
 const goalStore = useGoalStore()
@@ -85,6 +85,11 @@ async function handleAddFunds() {
   if (!fundingGoalId.value || !amount || amount <= 0) return
 
   if (!isAdding.value) {
+    const goal = goalStore.goals.find(g => g.id === fundingGoalId.value)
+    if (goal && amount > goal.currentAmount) {
+      toast.add({ title: `Can't withdraw more than saved (${formatCurrency(goal.currentAmount, auth.currency)})`, color: 'error' })
+      return
+    }
     await goalStore.removeFunds(fundingGoalId.value, amount)
     toast.add({ title: `Withdrew ${formatCurrency(amount, auth.currency)}`, color: 'neutral' })
   } else {
@@ -182,7 +187,7 @@ const iconSubset = [
         <div>
           <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Target Amount</label>
           <div class="relative">
-            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">{{ auth.currency }}</span>
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">{{ getCurrencySymbol(auth.currency) }}</span>
             <input
               v-model="formTarget"
               type="number"
@@ -266,7 +271,7 @@ const iconSubset = [
           {{ isAdding ? 'Add to savings' : 'Withdraw from savings' }}
         </h3>
         <div class="relative">
-          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">{{ auth.currency }}</span>
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">{{ getCurrencySymbol(auth.currency) }}</span>
           <input
             v-model="fundAmount"
             type="number"
