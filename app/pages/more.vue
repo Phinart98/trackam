@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getCurrencySymbol, SUPPORTED_CURRENCIES } from '~/utils/formatters'
+import { getCurrencyFlag, getCurrencySymbol, SUPPORTED_CURRENCIES } from '~/utils/formatters'
 import { BUSINESS_TYPES } from '~/utils/categories'
 
 const auth = useAuthStore()
@@ -9,6 +9,7 @@ const chat = useChatStore()
 const toast = useToast()
 
 const businessTypes = BUSINESS_TYPES
+const SAVE_FAILURE_TOAST = { title: 'Currency updated locally', description: 'Could not save to server — it may reset on next login.', color: 'warning' as const }
 
 const businessTypeLabel = computed(() =>
   businessTypes.find(b => b.value === auth.profile?.businessType)?.label
@@ -27,15 +28,18 @@ function openProfileEdit() {
   isEditingProfile.value = true
 }
 
-function saveProfileEdit() {
+async function saveProfileEdit() {
   if (!auth.profile) return
   auth.profile.name = editName.value.trim() || auth.profile.name
   auth.profile.businessType = editBusinessType.value
   isEditingProfile.value = false
   // Cancel any in-flight debounced save to prevent a race with the explicit save
   if (saveTimer) clearTimeout(saveTimer)
-  auth.saveProfile()
-  toast.add({ title: 'Profile updated', color: 'success' })
+  const saved = await auth.saveProfile()
+  toast.add(saved
+    ? { title: 'Profile updated', color: 'success' }
+    : { title: 'Profile saved locally', description: 'Could not save to server — it may reset on next login.', color: 'warning' }
+  )
 }
 
 // ── Preferences (auto-save) ───────────────────────────────────────────────────
@@ -85,11 +89,8 @@ async function changeCurrency(newCode: string) {
         })
         selectedCurrency.value = newCode
         const saved = await auth.saveProfile()
-        if (!saved) {
-          toast.add({ title: 'Currency updated locally', description: 'Could not save to server — it may reset on next login.', color: 'warning' })
-        }
-        await tx.fetchFromApi(apiBase)
-        await goalStore.loadGoals()
+        if (!saved) toast.add(SAVE_FAILURE_TOAST)
+        await Promise.all([tx.fetchFromApi(apiBase), goalStore.loadGoals()])
         tx.aiInsightAt = 0  // force dashboard insight to reflect new currency
         toast.add({ title: `Amounts converted to ${newCode}`, color: 'success' })
       } catch {
@@ -103,9 +104,7 @@ async function changeCurrency(newCode: string) {
   // No conversion needed (or user declined) — just update currency
   selectedCurrency.value = newCode
   const saved = await auth.saveProfile()
-  if (!saved) {
-    toast.add({ title: 'Currency updated locally', description: 'Could not save to server — it may reset on next login.', color: 'warning' })
-  }
+  if (!saved) toast.add(SAVE_FAILURE_TOAST)
 }
 
 const showCurrencyPicker = ref(false)
@@ -362,7 +361,7 @@ function logout() {
               class="w-full flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-emerald-400 text-left"
               @click="showCurrencyPicker = !showCurrencyPicker"
             >
-              <span class="text-base">{{ SUPPORTED_CURRENCIES.find(c => c.code === selectedCurrency)?.flag }}</span>
+              <span class="text-base">{{ getCurrencyFlag(selectedCurrency) }}</span>
               <span class="flex-1">{{ SUPPORTED_CURRENCIES.find(c => c.code === selectedCurrency)?.label }}</span>
               <UIcon
                 name="i-lucide-chevron-down"

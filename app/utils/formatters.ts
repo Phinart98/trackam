@@ -37,6 +37,9 @@ export const SUPPORTED_CURRENCIES: SupportedCurrency[] = [
 export const getCurrencySymbol = (code: string): string =>
   SUPPORTED_CURRENCIES.find(c => c.code === code)?.symbol ?? code
 
+export const getCurrencyFlag = (code: string): string =>
+  SUPPORTED_CURRENCIES.find(c => c.code === code)?.flag ?? ''
+
 export const formatCurrency = (amount: number, currency: string = 'GHS'): string => {
   if (!Number.isFinite(amount)) return `${getCurrencySymbol(currency)} --`
   const symbol = getCurrencySymbol(currency)

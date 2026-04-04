@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { COLOR_PRESETS } from '~/stores/categories'
-import { formatCurrency, getCurrencySymbol, ringOffset, SUPPORTED_CURRENCIES } from '~/utils/formatters'
+import { formatCurrency, getCurrencyFlag, getCurrencySymbol, ringOffset, SUPPORTED_CURRENCIES } from '~/utils/formatters'
 
 const auth = useAuthStore()
 const goalStore = useGoalStore()
@@ -128,11 +128,10 @@ watch(fundCurrency, async (newCurrency) => {
 })
 
 function openFunds(goalId: string, adding: boolean) {
-  const goal = goalStore.goals.find(g => g.id === goalId)
   fundingGoalId.value = goalId
   isAdding.value = adding
   fundAmount.value = ''
-  fundCurrency.value = goal?.currency ?? auth.currency
+  fundCurrency.value = fundingGoal.value?.currency ?? auth.currency
   fundFxRate.value = null
   fundFxLoading.value = false
   showFundCurrencyPicker.value = false
@@ -145,7 +144,8 @@ async function handleAddFunds() {
     return
   }
 
-  const goal = fundingGoal.value!
+  const goal = fundingGoal.value
+  if (!goal) return
   const amount = fundAmountInGoalCurrency.value ?? fundParsedAmount.value
   const displayAmount = formatCurrency(amount, goal.currency)
 
@@ -354,7 +354,7 @@ const iconSubset = [
                 class="flex items-center gap-1.5 h-full px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm font-medium text-slate-700 hover:border-emerald-300 transition-colors whitespace-nowrap"
                 @click="showFundCurrencyPicker = !showFundCurrencyPicker"
               >
-                {{ SUPPORTED_CURRENCIES.find(c => c.code === fundCurrency)?.flag }}
+                {{ getCurrencyFlag(fundCurrency) }}
                 {{ fundCurrency }}
                 <UIcon
                   name="i-lucide-chevron-down"
