@@ -91,7 +91,7 @@ async function changeCurrency(newCode: string) {
         const saved = await auth.saveProfile()
         if (!saved) toast.add(SAVE_FAILURE_TOAST)
         await Promise.all([tx.fetchFromApi(apiBase), goalStore.loadGoals()])
-        tx.aiInsightAt = 0  // force dashboard insight to reflect new currency
+        tx.aiInsightAt = 0 // force dashboard insight to reflect new currency
         toast.add({ title: `Amounts converted to ${newCode}`, color: 'success' })
       } catch {
         // Conversion failed — data unchanged, no need to revert or re-save

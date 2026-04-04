@@ -101,7 +101,9 @@ const needsConversion = computed(() =>
 // If the user switches NGN → KES before the NGN fetch resolves, the NGN result is discarded.
 let fxFetchGen = 0
 let componentMounted = true
-onUnmounted(() => { componentMounted = false })
+onUnmounted(() => {
+  componentMounted = false
+})
 
 watch(fundCurrency, async (newCurrency) => {
   fundFxRate.value = null
@@ -116,7 +118,7 @@ watch(fundCurrency, async (newCurrency) => {
     const data = await $fetch<{ rate: number }>(`${apiBase}/api/fx/rate?from=${newCurrency}&to=${fundingGoal.value.currency}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     })
-    if (!componentMounted || gen !== fxFetchGen) return  // superseded or unmounted
+    if (!componentMounted || gen !== fxFetchGen) return // superseded or unmounted
     fundFxRate.value = Number(data.rate)
   } catch {
     if (!componentMounted || gen !== fxFetchGen) return
