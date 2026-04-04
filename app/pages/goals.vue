@@ -97,11 +97,17 @@ const needsConversion = computed(() =>
   !!fundingGoal.value && fundCurrency.value !== fundingGoal.value.currency
 )
 
-// Fetch exchange rate whenever the input currency changes
+// Generation counter guards against stale FX rates from rapid currency switching.
+// If the user switches NGN → KES before the NGN fetch resolves, the NGN result is discarded.
+let fxFetchGen = 0
+let componentMounted = true
+onUnmounted(() => { componentMounted = false })
+
 watch(fundCurrency, async (newCurrency) => {
   fundFxRate.value = null
   if (!fundingGoal.value || newCurrency === fundingGoal.value.currency) return
 
+  const gen = ++fxFetchGen
   fundFxLoading.value = true
   try {
     const config = useRuntimeConfig()
@@ -110,13 +116,14 @@ watch(fundCurrency, async (newCurrency) => {
     const data = await $fetch<{ rate: number }>(`${apiBase}/api/fx/rate?from=${newCurrency}&to=${fundingGoal.value.currency}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     })
+    if (!componentMounted || gen !== fxFetchGen) return  // superseded or unmounted
     fundFxRate.value = Number(data.rate)
   } catch {
+    if (!componentMounted || gen !== fxFetchGen) return
     toast.add({ title: 'Could not fetch exchange rate', color: 'error' })
-    // Revert to goal currency so user isn't stuck
     fundCurrency.value = fundingGoal.value?.currency ?? auth.currency
   } finally {
-    fundFxLoading.value = false
+    if (componentMounted && gen === fxFetchGen) fundFxLoading.value = false
   }
 })
 

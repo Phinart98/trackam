@@ -84,7 +84,10 @@ async function changeCurrency(newCode: string) {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         })
         selectedCurrency.value = newCode
-        await auth.saveProfile()
+        const saved = await auth.saveProfile()
+        if (!saved) {
+          toast.add({ title: 'Currency updated locally', description: 'Could not save to server — it may reset on next login.', color: 'warning' })
+        }
         await tx.fetchFromApi(apiBase)
         await goalStore.loadGoals()
         tx.aiInsightAt = 0  // force dashboard insight to reflect new currency
@@ -99,7 +102,10 @@ async function changeCurrency(newCode: string) {
 
   // No conversion needed (or user declined) — just update currency
   selectedCurrency.value = newCode
-  await auth.saveProfile()
+  const saved = await auth.saveProfile()
+  if (!saved) {
+    toast.add({ title: 'Currency updated locally', description: 'Could not save to server — it may reset on next login.', color: 'warning' })
+  }
 }
 
 const showCurrencyPicker = ref(false)

@@ -271,10 +271,10 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /** Persist current profile state to backend (fire-and-forget). */
-    async saveProfile() {
-      if (!this.profile) return
+    async saveProfile(): Promise<boolean> {
+      if (!this.profile) return false
       const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
-      if (!apiBase) return
+      if (!apiBase) return false
       try {
         const token = await getAuthToken()
         await $fetch(`${apiBase}/api/profile`, {
@@ -289,8 +289,9 @@ export const useAuthStore = defineStore('auth', {
             onboarded: this.profile.onboarded
           }
         })
+        return true
       } catch {
-        // Non-critical — profile is still saved locally in Pinia
+        return false
       }
     },
 
