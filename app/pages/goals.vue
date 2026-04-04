@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { COLOR_PRESETS } from '~/stores/categories'
-import { formatCurrency, getCurrencySymbol, ringOffset } from '~/utils/formatters'
+import { formatCurrency, getCurrencySymbol, ringOffset, SUPPORTED_CURRENCIES } from '~/utils/formatters'
 
 const auth = useAuthStore()
 const goalStore = useGoalStore()
@@ -22,85 +22,96 @@ function goalDotColor(goal: { color: string, dotColor?: string }): string {
   return goal.dotColor ?? COLOR_PRESETS.find(p => p.color === goal.color)?.dotColor ?? '#64748b'
 }
 
-// Add/withdraw funds modal
+// ── Add/withdraw funds modal ──────────────────────────────────────────────────
 const fundingGoalId = ref<string | null>(null)
 const fundAmount = ref('')
 const isAdding = ref(true)
+const fundCurrency = ref('')
+const showFundCurrencyPicker = ref(false)
+const fundFxRate = ref<number | null>(null)
+const fundFxLoading = ref(false)
 
-function resetForm() {
-  formName.value = ''
-  formTarget.value = ''
-  formIcon.value = 'i-lucide-trending-up'
-  formColorIdx.value = 4
-  formDeadline.value = ''
-  editingId.value = null
-  showForm.value = false
-}
+const fundingGoal = computed(() =>
+  goalStore.goals.find(g => g.id === fundingGoalId.value) ?? null
+)
 
-function startEdit(goal: { id: string, name: string, icon: string, color: string, targetAmount: number, deadline?: string }) {
-  editingId.value = goal.id
-  formName.value = goal.name
-  formTarget.value = goal.targetAmount.toString()
-  formIcon.value = goal.icon
-  formDeadline.value = goal.deadline?.slice(0, 10) ?? ''
-  formColorIdx.value = COLOR_PRESETS.findIndex(c => c.color === goal.color)
-  if (formColorIdx.value === -1) formColorIdx.value = 4
-  showForm.value = true
-}
+const fundParsedAmount = computed(() => parseFloat(fundAmount.value) || 0)
 
-async function handleSave() {
-  const name = formName.value.trim()
-  const target = parseFloat(formTarget.value)
-  if (!name || !target || target <= 0) return
+// Amount that will actually be stored in goal currency
+const fundAmountInGoalCurrency = computed((): number | null => {
+  if (!fundingGoal.value || fundParsedAmount.value <= 0) return null
+  if (fundCurrency.value === fundingGoal.value.currency) return fundParsedAmount.value
+  if (fundFxRate.value === null) return null
+  return fundParsedAmount.value * fundFxRate.value
+})
 
-  const base = {
-    name,
-    targetAmount: target,
-    currency: auth.currency,
-    icon: formIcon.value,
-    color: formColor.value.color,
-    bgColor: formColor.value.bgColor,
-    dotColor: formColor.value.dotColor,
-    deadline: formDeadline.value || undefined
+const needsConversion = computed(() =>
+  !!fundingGoal.value && fundCurrency.value !== fundingGoal.value.currency
+)
+
+// Fetch exchange rate whenever the input currency changes
+watch(fundCurrency, async (newCurrency) => {
+  fundFxRate.value = null
+  if (!fundingGoal.value || newCurrency === fundingGoal.value.currency) return
+
+  fundFxLoading.value = true
+  try {
+    const config = useRuntimeConfig()
+    const apiBase = config.public.apiBaseUrl as string
+    const token = await getAuthToken()
+    const data = await $fetch<{ rate: number }>(`${apiBase}/api/fx/rate?from=${newCurrency}&to=${fundingGoal.value.currency}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
+    fundFxRate.value = Number(data.rate)
+  } catch {
+    toast.add({ title: 'Could not fetch exchange rate', color: 'error' })
+    // Revert to goal currency so user isn't stuck
+    fundCurrency.value = fundingGoal.value?.currency ?? auth.currency
+  } finally {
+    fundFxLoading.value = false
   }
-
-  if (isEditing.value) {
-    await goalStore.updateGoal(editingId.value!, base)
-    toast.add({ title: 'Goal updated', color: 'success' })
-  } else {
-    await goalStore.addGoal({ ...base, currentAmount: 0 })
-    toast.add({ title: 'Goal created! Start saving.', color: 'success' })
-  }
-  resetForm()
-}
+})
 
 function openFunds(goalId: string, adding: boolean) {
+  const goal = goalStore.goals.find(g => g.id === goalId)
   fundingGoalId.value = goalId
   isAdding.value = adding
   fundAmount.value = ''
+  fundCurrency.value = goal?.currency ?? auth.currency
+  fundFxRate.value = null
+  fundFxLoading.value = false
+  showFundCurrencyPicker.value = false
 }
 
 async function handleAddFunds() {
-  const amount = parseFloat(fundAmount.value)
-  if (!fundingGoalId.value || !amount || amount <= 0) return
+  if (!fundingGoalId.value || fundParsedAmount.value <= 0) return
+  if (needsConversion.value && fundAmountInGoalCurrency.value === null) {
+    toast.add({ title: 'Exchange rate not loaded yet', color: 'error' })
+    return
+  }
+
+  const goal = fundingGoal.value!
+  const amount = fundAmountInGoalCurrency.value ?? fundParsedAmount.value
+  const displayAmount = formatCurrency(amount, goal.currency)
 
   if (!isAdding.value) {
-    const goal = goalStore.goals.find(g => g.id === fundingGoalId.value)
-    if (goal && amount > goal.currentAmount) {
-      toast.add({ title: `Can't withdraw more than saved (${formatCurrency(goal.currentAmount, auth.currency)})`, color: 'error' })
+    if (amount > goal.currentAmount) {
+      toast.add({ title: `Can't withdraw more than saved (${formatCurrency(goal.currentAmount, goal.currency)})`, color: 'error' })
       return
     }
     await goalStore.removeFunds(fundingGoalId.value, amount)
-    toast.add({ title: `Withdrew ${formatCurrency(amount, auth.currency)}`, color: 'neutral' })
+    toast.add({ title: `Withdrew ${displayAmount}`, color: 'neutral' })
   } else {
     const capped = await goalStore.addFunds(fundingGoalId.value, amount)
     toast.add(capped
       ? { title: 'Goal reached! Congratulations! 🎉', color: 'success' }
-      : { title: `Added ${formatCurrency(amount, auth.currency)}`, color: 'success' }
+      : { title: `Added ${displayAmount}`, color: 'success' }
     )
   }
+
   fundingGoalId.value = null
   fundAmount.value = ''
+  showFundCurrencyPicker.value = false
 }
 
 const { confirm } = useConfirm()
@@ -264,39 +275,121 @@ const iconSubset = [
     <div
       v-if="fundingGoalId"
       class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30"
-      @click.self="fundingGoalId = null"
+      @click.self="fundingGoalId = null; showFundCurrencyPicker = false"
     >
       <div class="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-sm p-5 space-y-4 safe-area-bottom">
-        <h3 class="text-sm font-bold text-slate-800">
-          {{ isAdding ? 'Add to savings' : 'Withdraw from savings' }}
-        </h3>
-        <div class="relative">
-          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">{{ getCurrencySymbol(auth.currency) }}</span>
-          <input
-            v-model="fundAmount"
-            type="number"
-            min="1"
-            step="0.01"
-            :placeholder="isAdding ? 'Amount to add' : 'Amount to withdraw'"
-            class="w-full rounded-lg border border-slate-200 bg-white pl-14 pr-3 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
-            autofocus
-            @keyup.enter="handleAddFunds"
-          >
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-800">
+            {{ isAdding ? 'Add to savings' : 'Withdraw from savings' }}
+          </h3>
+          <span class="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+            Goal in {{ fundingGoal?.currency }}
+          </span>
         </div>
+
+        <!-- Currency selector + amount input -->
+        <div class="space-y-2">
+          <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Enter amount in</label>
+          <div class="flex gap-2">
+            <!-- Currency picker button -->
+            <div class="relative">
+              <button
+                type="button"
+                class="flex items-center gap-1.5 h-full px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm font-medium text-slate-700 hover:border-emerald-300 transition-colors whitespace-nowrap"
+                @click="showFundCurrencyPicker = !showFundCurrencyPicker"
+              >
+                {{ SUPPORTED_CURRENCIES.find(c => c.code === fundCurrency)?.flag }}
+                {{ fundCurrency }}
+                <UIcon
+                  name="i-lucide-chevron-down"
+                  class="text-slate-400 text-xs shrink-0"
+                  :class="showFundCurrencyPicker ? 'rotate-180' : ''"
+                />
+              </button>
+              <!-- Dropdown -->
+              <div
+                v-if="showFundCurrencyPicker"
+                class="absolute z-20 left-0 bottom-full mb-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto"
+              >
+                <button
+                  v-for="c in SUPPORTED_CURRENCIES"
+                  :key="c.code"
+                  type="button"
+                  class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-slate-50 transition-colors"
+                  :class="fundCurrency === c.code ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-800'"
+                  @click="fundCurrency = c.code; showFundCurrencyPicker = false"
+                >
+                  <span>{{ c.flag }}</span>
+                  <span class="font-medium">{{ c.code }}</span>
+                  <span class="text-slate-400 text-xs truncate">{{ c.label }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Amount input -->
+            <div class="relative flex-1">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">
+                {{ getCurrencySymbol(fundCurrency) }}
+              </span>
+              <input
+                v-model="fundAmount"
+                type="number"
+                min="1"
+                step="0.01"
+                :placeholder="isAdding ? 'Amount to add' : 'Amount to withdraw'"
+                class="w-full rounded-lg border border-slate-200 bg-white pl-14 pr-3 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
+                autofocus
+                @keyup.enter="handleAddFunds"
+              >
+            </div>
+          </div>
+
+          <!-- Conversion preview -->
+          <div
+            v-if="needsConversion && fundParsedAmount > 0"
+            class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-50"
+          >
+            <UIcon
+              v-if="fundFxLoading"
+              name="i-lucide-loader-circle"
+              class="text-blue-400 text-sm animate-spin shrink-0"
+            />
+            <UIcon
+              v-else
+              name="i-lucide-arrow-right-left"
+              class="text-blue-500 text-sm shrink-0"
+            />
+            <span class="text-xs text-blue-700">
+              <template v-if="fundFxLoading">Fetching rate…</template>
+              <template v-else-if="fundAmountInGoalCurrency !== null">
+                ≈ <strong>{{ formatCurrency(fundAmountInGoalCurrency, fundingGoal!.currency) }}</strong>
+                stored in {{ fundingGoal!.currency }}
+              </template>
+            </span>
+          </div>
+        </div>
+
+        <!-- Actions -->
         <div class="flex gap-2">
           <button
             class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm"
-            @click="fundingGoalId = null"
+            @click="fundingGoalId = null; showFundCurrencyPicker = false"
           >
             Cancel
           </button>
           <button
-            :disabled="!fundAmount || parseFloat(fundAmount) <= 0"
-            class="flex-1 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50"
-            :class="isAdding ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'"
+            :disabled="fundParsedAmount <= 0 || (needsConversion && fundAmountInGoalCurrency === null)"
+            class="flex-1 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 transition-colors"
+            :class="isAdding ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'bg-amber-500 text-white hover:bg-amber-600'"
             @click="handleAddFunds"
           >
-            {{ isAdding ? 'Add Funds' : 'Withdraw' }}
+            <template v-if="needsConversion && fundAmountInGoalCurrency !== null">
+              {{ isAdding ? 'Add' : 'Withdraw' }} {{ formatCurrency(fundAmountInGoalCurrency, fundingGoal!.currency) }}
+            </template>
+            <template v-else>
+              {{ isAdding ? 'Add Funds' : 'Withdraw' }}
+            </template>
           </button>
         </div>
       </div>
