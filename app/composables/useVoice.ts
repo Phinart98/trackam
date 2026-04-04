@@ -51,7 +51,10 @@ export function useVoice() {
       }
 
       mediaRecorder.onstop = async () => {
-        const recordedMime = mediaRecorder!.mimeType || 'audio/webm'
+        const rawMime = mediaRecorder!.mimeType || 'audio/webm'
+        // Some mobile browsers (iOS WebKit, some Android) report video/* for audio-only recordings.
+        // Normalize to audio/* so the backend guardrail accepts it and Groq processes it correctly.
+        const recordedMime = rawMime.startsWith('video/') ? rawMime.replace('video/', 'audio/') : rawMime
         const blob = new Blob(chunks, { type: recordedMime })
         // Release the browser's mic indicator immediately
         mediaRecorder!.stream.getTracks().forEach(t => t.stop())

@@ -109,7 +109,7 @@ function renderMarkdown(text: string) {
     <!-- Messages area -->
     <div
       ref="messagesEl"
-      class="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+      class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4"
     >
       <!-- Empty state with suggestions -->
       <div

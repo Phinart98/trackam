@@ -12,6 +12,11 @@ const insightLoading = ref(false)
 
 const SIX_HOURS = 6 * 60 * 60 * 1000
 
+async function forceRefreshInsight() {
+  tx.aiInsightAt = 0
+  await refreshInsightIfStale()
+}
+
 async function refreshInsightIfStale() {
   if (tx.transactions.length === 0) return
   const stale = Date.now() - tx.aiInsightAt > SIX_HOURS
@@ -294,10 +299,23 @@ const hasWeeklyData = computed(() =>
           :class="{ 'animate-spin': insightLoading }"
         />
       </div>
-      <div class="min-w-0">
-        <p class="text-xs font-bold text-violet-700 mb-0.5">
-          AI Insight
-        </p>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between mb-0.5">
+          <p class="text-xs font-bold text-violet-700">
+            AI Insight
+          </p>
+          <button
+            v-if="!insightLoading && tx.transactions.length > 0"
+            class="text-violet-300 hover:text-violet-500 transition-colors"
+            title="Refresh insight"
+            @click="forceRefreshInsight"
+          >
+            <UIcon
+              name="i-lucide-refresh-cw"
+              class="text-xs"
+            />
+          </button>
+        </div>
         <p class="text-sm text-slate-700 leading-relaxed">
           {{ tx.aiInsight ?? insightText }}
         </p>

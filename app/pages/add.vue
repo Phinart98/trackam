@@ -396,12 +396,20 @@ const confidenceColor = (score: number) =>
             </div>
           </div>
 
-          <button
-            class="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all"
-            @click="saveTransaction(parsedResult!, textFromVoice ? 'ai-voice' : 'ai-text', parsedDateEdit)"
-          >
-            Confirm & Save
-          </button>
+          <div class="flex gap-2">
+            <button
+              class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors"
+              @click="parsedResult = null; textInput = ''; textFromVoice = false"
+            >
+              Cancel
+            </button>
+            <button
+              class="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all"
+              @click="saveTransaction(parsedResult!, textFromVoice ? 'ai-voice' : 'ai-text', parsedDateEdit)"
+            >
+              Confirm & Save
+            </button>
+          </div>
         </div>
       </div>
 
@@ -531,12 +539,20 @@ const confidenceColor = (score: number) =>
             </div>
           </div>
 
-          <button
-            class="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all"
-            @click="saveTransaction(scanResult!, 'ai-image', scanDateEdit)"
-          >
-            Confirm & Save
-          </button>
+          <div class="flex gap-2">
+            <button
+              class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors"
+              @click="scanResult = null; selectedFile = null; previewUrl = null"
+            >
+              Cancel
+            </button>
+            <button
+              class="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all"
+              @click="saveTransaction(scanResult!, 'ai-image', scanDateEdit)"
+            >
+              Confirm & Save
+            </button>
+          </div>
         </div>
       </div>
 
