@@ -48,7 +48,7 @@ const sourceLabel = computed(() => {
         {{ transaction.description }}
       </p>
       <div class="flex items-center gap-1.5 mt-0.5">
-        <span class="text-xs text-slate-400">{{ formatRelativeTime(transaction.date) }}</span>
+        <span class="text-xs text-slate-400">{{ formatRelativeTime(transaction.date, transaction.createdAt) }}</span>
         <span
           v-if="transaction.vendor && !compact"
           class="text-xs text-slate-400"

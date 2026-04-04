@@ -183,7 +183,7 @@ onUnmounted(() => observer?.disconnect())
               class="group hover:bg-slate-50 transition-colors"
             >
               <td class="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
-                {{ formatRelativeTime(t.date) }}
+                {{ formatRelativeTime(t.date, t.createdAt) }}
               </td>
               <td class="px-4 py-3">
                 <p class="text-sm font-medium text-slate-800 truncate max-w-[220px]">
@@ -300,7 +300,7 @@ onUnmounted(() => observer?.disconnect())
                     {{ t.description }}
                   </p>
                   <p class="text-xs text-slate-400 mt-0.5">
-                    {{ formatRelativeTime(t.date) }}
+                    {{ formatRelativeTime(t.date, t.createdAt) }}
                   </p>
                 </div>
                 <!-- Amount + chevron -->

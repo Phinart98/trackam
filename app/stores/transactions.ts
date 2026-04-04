@@ -17,7 +17,12 @@ export const useTransactionStore = defineStore('transactions', {
   }),
 
   getters: {
-    sorted: state => [...state.transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    sorted: state => [...state.transactions].sort((a, b) => {
+      const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime()
+      if (dateDiff !== 0) return dateDiff
+      // Same date: sort by insertion time so entries appear in the order they were added
+      return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+    }),
 
     totalIncome: state => sumByType(state.transactions, 'income'),
     totalExpenses: state => sumByType(state.transactions, 'expense'),

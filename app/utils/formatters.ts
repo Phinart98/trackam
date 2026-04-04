@@ -49,10 +49,14 @@ export const formatDate = (dateStr: string): string => {
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-export const formatRelativeTime = (dateStr: string): string => {
-  const date = new Date(dateStr)
+export const formatRelativeTime = (dateStr: string, createdAt?: string): string => {
   const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
+  const txDate = new Date(dateStr)
+  const isToday = txDate.toDateString() === now.toDateString()
+
+  // For today's entries, show time relative to server insertion (createdAt), not midnight
+  const ref = isToday && createdAt ? new Date(createdAt) : txDate
+  const diffMs = now.getTime() - ref.getTime()
   const diffMin = Math.floor(diffMs / 60000)
   const diffHr = Math.floor(diffMin / 60)
   const diffDays = Math.floor(diffHr / 24)
