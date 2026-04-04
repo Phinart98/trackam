@@ -36,6 +36,13 @@ export default defineNuxtConfig({
     }
   },
 
+  icon: {
+    clientBundle: {
+      scan: true,
+      includeCustomCollections: true
+    }
+  },
+
   compatibilityDate: '2025-01-15',
 
   vite: {
