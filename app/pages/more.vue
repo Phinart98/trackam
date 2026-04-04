@@ -53,12 +53,44 @@ function scheduleProfileSave() {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => auth.saveProfile(), 1500)
 }
-watch([selectedCurrency, budget], ([newCur, newBudget], [oldCur, oldBudget]) => {
-  if (newCur !== oldCur || newBudget !== oldBudget) scheduleProfileSave()
+watch(budget, (newBudget, oldBudget) => {
+  if (newBudget !== oldBudget) scheduleProfileSave()
 })
 onUnmounted(() => {
   if (saveTimer) clearTimeout(saveTimer)
 })
+
+async function changeCurrency(newCode: string) {
+  const oldCode = auth.currency
+  if (newCode === oldCode) return
+  showCurrencyPicker.value = false
+
+  const config = useRuntimeConfig()
+  const apiBase = config.public.apiBaseUrl as string
+
+  selectedCurrency.value = newCode
+  scheduleProfileSave()
+
+  if (!apiBase || !tx.transactions.length) return
+
+  const doConvert = await confirm(
+    `Convert existing amounts from ${oldCode} to ${newCode}?`,
+    { message: 'This will update all transaction amounts using today\'s exchange rate.', confirmLabel: 'Convert' }
+  )
+  if (!doConvert) return
+
+  try {
+    const token = await getAuthToken()
+    await $fetch(`${apiBase}/api/transactions/convert-currency?from=${oldCode}&to=${newCode}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
+    await tx.fetchFromApi(apiBase)
+    toast.add({ title: `Amounts converted to ${newCode}`, color: 'success' })
+  } catch {
+    toast.add({ title: 'Conversion failed', description: 'Amounts were not converted. Try again.', color: 'error' })
+  }
+}
 
 const showCurrencyPicker = ref(false)
 
@@ -330,7 +362,7 @@ function logout() {
                 type="button"
                 class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 text-left transition-colors"
                 :class="selectedCurrency === c.code ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-800'"
-                @click="selectedCurrency = c.code; showCurrencyPicker = false"
+                @click="changeCurrency(c.code)"
               >
                 <span class="text-base">{{ c.flag }}</span>
                 <span class="flex-1">{{ c.label }}</span>

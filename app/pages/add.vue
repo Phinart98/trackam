@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { ParsedTransaction } from '~/types'
-import { formatCurrency, getCurrencySymbol } from '~/utils/formatters'
+import { formatCurrency, getCurrencySymbol, SUPPORTED_CURRENCIES } from '~/utils/formatters'
 
 const auth = useAuthStore()
 const tx = useTransactionStore()
@@ -131,12 +131,26 @@ async function handleScan(file: File) {
 const isSavingManual = ref(false)
 const manualType = ref<'income' | 'expense'>('expense')
 const manualAmount = ref('')
+const manualCurrency = ref(auth.currency)
 const manualCategory = ref('')
 const manualDescription = ref('')
 const manualDate = ref(new Date().toISOString().slice(0, 10))
 const manualCategories = computed(() =>
   manualType.value === 'income' ? catStore.incomeCategories : catStore.expenses
 )
+const showManualCurrencyPicker = ref(false)
+
+async function fetchFxRate(from: string, to: string, date: string): Promise<number | null> {
+  try {
+    const dateTag = date || 'latest'
+    const url = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${dateTag}/v1/currencies/${from.toLowerCase()}.json`
+    const data = await $fetch<Record<string, unknown>>(url)
+    const rates = data[from.toLowerCase()] as Record<string, number> | undefined
+    return rates?.[to.toLowerCase()] ?? null
+  } catch {
+    return null
+  }
+}
 
 // --- Save helpers ---
 async function saveTransaction(result: ParsedTransaction, source: 'ai-text' | 'ai-image' | 'ai-voice' | 'manual', dateOverride?: string) {
@@ -156,16 +170,29 @@ async function saveTransaction(result: ParsedTransaction, source: 'ai-text' | 'a
 }
 
 async function saveManual() {
-  const amount = parseFloat(manualAmount.value)
-  if (!manualCategory.value || !manualDescription.value || !isFinite(amount) || amount <= 0) return
+  const rawAmount = parseFloat(manualAmount.value)
+  if (!manualCategory.value || !manualDescription.value || !isFinite(rawAmount) || rawAmount <= 0) return
   isSavingManual.value = true
   try {
+    let amount = rawAmount
+    let originalCurrency: string | undefined
+    if (manualCurrency.value !== auth.currency) {
+      const rate = await fetchFxRate(manualCurrency.value, auth.currency, manualDate.value)
+      if (rate) {
+        amount = Math.round(rawAmount * rate * 100) / 100
+        originalCurrency = manualCurrency.value
+      }
+    }
+
+    const desc = originalCurrency
+      ? `${manualDescription.value} (${originalCurrency} ${rawAmount})`
+      : manualDescription.value
     await tx.saveTransaction({
       type: manualType.value,
       amount,
       currency: auth.currency,
       category: manualCategory.value,
-      description: manualDescription.value,
+      description: desc,
       date: manualDate.value,
       source: 'manual'
     })
@@ -334,16 +361,39 @@ const confidenceColor = (score: number) =>
             </span>
           </div>
 
-          <div class="flex items-center gap-3">
-            <span
-              class="text-xs font-semibold px-2.5 py-1 rounded-full"
-              :class="parsedResult.type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+          <!-- Editable type toggle -->
+          <div class="flex gap-1.5 p-0.5 bg-slate-100 rounded-lg w-fit">
+            <button
+              class="px-3 py-1 rounded-md text-xs font-semibold transition-all"
+              :class="parsedResult.type === 'expense' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'"
+              @click="parsedResult.type = 'expense'"
             >
-              {{ parsedResult.type }}
-            </span>
-            <span class="text-xs text-slate-400 capitalize">
-              {{ catStore.byId(parsedResult.category)?.name ?? parsedResult.category }}
-            </span>
+              Expense
+            </button>
+            <button
+              class="px-3 py-1 rounded-md text-xs font-semibold transition-all"
+              :class="parsedResult.type === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'"
+              @click="parsedResult.type = 'income'"
+            >
+              Income
+            </button>
+          </div>
+          <!-- Editable category -->
+          <div class="grid grid-cols-4 gap-1.5">
+            <button
+              v-for="cat in (parsedResult.type === 'income' ? catStore.incomeCategories : catStore.expenses)"
+              :key="cat.id"
+              class="flex flex-col items-center gap-1 p-1.5 rounded-lg border text-center transition-all"
+              :class="parsedResult.category === cat.id
+                ? 'border-emerald-400 bg-emerald-50'
+                : 'border-slate-200 bg-white hover:border-slate-300'"
+              @click="parsedResult.category = cat.id"
+            >
+              <span class="flex items-center justify-center w-6 h-6 rounded-md" :class="cat.bgColor">
+                <UIcon :name="cat.icon" class="text-xs" :class="cat.color" />
+              </span>
+              <span class="text-[10px] font-medium text-slate-600 leading-tight">{{ cat.name }}</span>
+            </button>
           </div>
 
           <!-- FX conversion indicator -->
@@ -490,6 +540,41 @@ const confidenceColor = (score: number) =>
             </span>
           </div>
 
+          <!-- Editable type toggle -->
+          <div class="flex gap-1.5 p-0.5 bg-slate-100 rounded-lg w-fit">
+            <button
+              class="px-3 py-1 rounded-md text-xs font-semibold transition-all"
+              :class="scanResult.type === 'expense' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'"
+              @click="scanResult.type = 'expense'"
+            >
+              Expense
+            </button>
+            <button
+              class="px-3 py-1 rounded-md text-xs font-semibold transition-all"
+              :class="scanResult.type === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'"
+              @click="scanResult.type = 'income'"
+            >
+              Income
+            </button>
+          </div>
+          <!-- Editable category -->
+          <div class="grid grid-cols-4 gap-1.5">
+            <button
+              v-for="cat in (scanResult.type === 'income' ? catStore.incomeCategories : catStore.expenses)"
+              :key="cat.id"
+              class="flex flex-col items-center gap-1 p-1.5 rounded-lg border text-center transition-all"
+              :class="scanResult.category === cat.id
+                ? 'border-emerald-400 bg-emerald-50'
+                : 'border-slate-200 bg-white hover:border-slate-300'"
+              @click="scanResult.category = cat.id"
+            >
+              <span class="flex items-center justify-center w-6 h-6 rounded-md" :class="cat.bgColor">
+                <UIcon :name="cat.icon" class="text-xs" :class="cat.color" />
+              </span>
+              <span class="text-[10px] font-medium text-slate-600 leading-tight">{{ cat.name }}</span>
+            </button>
+          </div>
+
           <!-- FX conversion indicator -->
           <div
             v-if="scanResult.originalCurrency && scanResult.originalAmount"
@@ -585,19 +670,52 @@ const confidenceColor = (score: number) =>
         <!-- Amount -->
         <div>
           <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2">Amount</label>
-          <div class="relative">
-            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">
-              {{ getCurrencySymbol(auth.currency) }}
-            </span>
+          <div class="flex gap-2">
+            <!-- Currency picker button -->
+            <div class="relative">
+              <button
+                type="button"
+                class="h-full px-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:border-emerald-400 transition-colors flex items-center gap-1 min-w-[72px]"
+                @click="showManualCurrencyPicker = !showManualCurrencyPicker"
+              >
+                {{ getCurrencySymbol(manualCurrency) }}
+                <UIcon name="i-lucide-chevron-down" class="text-xs text-slate-400" />
+              </button>
+              <!-- Dropdown -->
+              <div
+                v-if="showManualCurrencyPicker"
+                class="absolute top-full left-0 mt-1 z-20 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto w-52"
+              >
+                <button
+                  v-for="c in SUPPORTED_CURRENCIES"
+                  :key="c.code"
+                  class="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-slate-50 transition-colors"
+                  :class="manualCurrency === c.code ? 'text-emerald-600 font-semibold' : 'text-slate-700'"
+                  @click="manualCurrency = c.code; showManualCurrencyPicker = false"
+                >
+                  <span>{{ c.flag }}</span>
+                  <span class="font-medium">{{ c.symbol }}</span>
+                  <span class="text-slate-400 text-xs">{{ c.label }}</span>
+                </button>
+              </div>
+            </div>
             <input
               v-model="manualAmount"
               type="number"
               step="0.01"
               min="0"
               placeholder="0.00"
-              class="w-full rounded-xl border border-slate-200 bg-white pl-16 pr-4 py-3.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
+              class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
             >
           </div>
+          <!-- FX note when different currency selected -->
+          <p
+            v-if="manualCurrency !== auth.currency"
+            class="text-xs text-blue-600 mt-1.5 flex items-center gap-1"
+          >
+            <UIcon name="i-lucide-arrow-right-left" class="text-xs" />
+            Will be converted to {{ getCurrencySymbol(auth.currency) }} at the date's rate
+          </p>
         </div>
 
         <!-- Category -->

@@ -10,8 +10,12 @@ const isStreaming = ref(false)
 const streamingId = ref<string | null>(null)
 const messagesEl = ref<HTMLElement | null>(null)
 let cancelled = false
+onMounted(() => {
+  document.documentElement.style.overflow = 'hidden'
+})
 onUnmounted(() => {
   cancelled = true
+  document.documentElement.style.overflow = ''
 })
 
 const suggestions = [
@@ -24,7 +28,7 @@ const suggestions = [
 async function streamText(msgId: string, fullText: string) {
   isStreaming.value = true
   streamingId.value = msgId
-  const charDelay = Math.max(8, Math.min(25, 1200 / fullText.length))
+  const charDelay = Math.max(4, Math.min(12, 600 / fullText.length))
   for (let i = 1; i <= fullText.length; i++) {
     if (cancelled) return
     chat.updateMessageContent(msgId, fullText.slice(0, i))
