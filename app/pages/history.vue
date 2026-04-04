@@ -70,8 +70,12 @@ function loadMore() {
 async function deleteTransaction(id: string) {
   const ok = await confirm('Delete transaction?', { message: 'This cannot be undone.' })
   if (!ok) return
-  tx.removeTransaction(id)
-  toast.add({ title: 'Transaction deleted', color: 'neutral' })
+  try {
+    await tx.removeTransaction(id)
+    toast.add({ title: 'Transaction deleted', color: 'neutral' })
+  } catch {
+    toast.add({ title: 'Delete failed', description: 'Could not delete transaction. Please try again.', color: 'error' })
+  }
 }
 
 onMounted(() => {

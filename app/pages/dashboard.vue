@@ -18,7 +18,7 @@ async function forceRefreshInsight() {
 }
 
 async function refreshInsightIfStale() {
-  if (tx.transactions.length === 0) return
+  if (insightLoading.value || tx.transactions.length === 0) return
   const stale = Date.now() - tx.aiInsightAt > SIX_HOURS
   const txCountChanged = tx.transactions.length !== tx.aiInsightTxCount
   if (!stale && !txCountChanged && tx.aiInsight) return

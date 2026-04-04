@@ -57,7 +57,8 @@ function generateId(name: string, existingIds: string[]): string {
 export const useCategoryStore = defineStore('categories', {
   state: () => ({
     custom: [] as Category[],
-    hiddenIds: [] as string[]
+    hiddenIds: [] as string[],
+    loading: false
   }),
 
   getters: {
@@ -123,10 +124,12 @@ export const useCategoryStore = defineStore('categories', {
 
     /** Fetch custom categories from backend API */
     async fetchFromApi() {
+      if (this.loading) return
       const config = useRuntimeConfig()
       const apiBaseUrl = config.public.apiBaseUrl as string
       if (!apiBaseUrl) return
 
+      this.loading = true
       try {
         const token = await getAuthToken()
         const data = await $fetch<Category[]>(`${apiBaseUrl}/api/categories`, {
@@ -135,6 +138,8 @@ export const useCategoryStore = defineStore('categories', {
         this.custom = data.map(c => ({ ...c, isDefault: false }))
       } catch (err) {
         console.warn('Failed to fetch categories from API:', err)
+      } finally {
+        this.loading = false
       }
     },
 
@@ -172,5 +177,7 @@ export const useCategoryStore = defineStore('categories', {
     }
   },
 
-  persist: true
+  persist: {
+    pick: ['custom', 'hiddenIds']
+  }
 })

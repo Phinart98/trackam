@@ -99,8 +99,9 @@ export const useAuthStore = defineStore('auth', {
               // A user in this path has a valid Supabase session but no Pinia profile —
               // they're a returning user on a new device or cleared localStorage.
               // New users always have a Pinia profile set by signUp(), so they never reach here.
-              // Default to onboarded:true to avoid re-showing onboarding to returning users.
-              if (this.profile) this.profile.onboarded = true
+              // Only default to true if Supabase metadata confirms they completed onboarding.
+              // New users who hit a cold-start timeout would otherwise skip onboarding entirely.
+              if (this.profile && metaOnboarded) this.profile.onboarded = true
             }
           }
         }

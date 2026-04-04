@@ -153,20 +153,30 @@ async function fetchFxRate(from: string, to: string, date: string): Promise<numb
 }
 
 // --- Save helpers ---
+const isSavingParsed = ref(false)
+
 async function saveTransaction(result: ParsedTransaction, source: 'ai-text' | 'ai-image' | 'ai-voice' | 'manual', dateOverride?: string) {
-  await tx.saveTransaction({
-    type: result.type,
-    amount: result.amount,
-    currency: auth.currency,
-    category: result.category,
-    description: result.description,
-    date: dateOverride || result.date,
-    source,
-    confidence: result.confidence,
-    vendor: result.vendor
-  })
-  toast.add({ title: 'Transaction saved', description: `${formatCurrency(result.amount, auth.currency)} ${result.type}`, color: 'success' })
-  navigateTo('/dashboard')
+  if (isSavingParsed.value) return
+  isSavingParsed.value = true
+  try {
+    await tx.saveTransaction({
+      type: result.type,
+      amount: result.amount,
+      currency: auth.currency,
+      category: result.category,
+      description: result.description,
+      date: dateOverride || result.date,
+      source,
+      confidence: result.confidence,
+      vendor: result.vendor
+    })
+    toast.add({ title: 'Transaction saved', description: `${formatCurrency(result.amount, auth.currency)} ${result.type}`, color: 'success' })
+    navigateTo('/dashboard')
+  } catch {
+    toast.add({ title: 'Save failed', description: 'Could not save transaction. Please try again.', color: 'error' })
+  } finally {
+    isSavingParsed.value = false
+  }
 }
 
 async function saveManual() {
@@ -181,6 +191,13 @@ async function saveManual() {
       if (rate) {
         amount = Math.round(rawAmount * rate * 100) / 100
         originalCurrency = manualCurrency.value
+      } else {
+        toast.add({
+          title: 'Exchange rate unavailable',
+          description: `Could not convert ${manualCurrency.value} → ${auth.currency}. Check your connection and try again.`,
+          color: 'warning'
+        })
+        return
       }
     }
 
@@ -205,7 +222,7 @@ async function saveManual() {
   }
 }
 
-const today = new Date().toISOString().slice(0, 10)
+const today = computed(() => new Date().toISOString().slice(0, 10))
 
 const confidenceColor = (score: number) =>
   score >= 90 ? 'text-green-600' : score >= 80 ? 'text-yellow-600' : 'text-red-500'
@@ -454,10 +471,11 @@ const confidenceColor = (score: number) =>
               Cancel
             </button>
             <button
-              class="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all"
+              :disabled="isSavingParsed"
+              class="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               @click="saveTransaction(parsedResult!, textFromVoice ? 'ai-voice' : 'ai-text', parsedDateEdit)"
             >
-              Confirm & Save
+              {{ isSavingParsed ? 'Saving…' : 'Confirm & Save' }}
             </button>
           </div>
         </div>
@@ -632,10 +650,11 @@ const confidenceColor = (score: number) =>
               Cancel
             </button>
             <button
-              class="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all"
+              :disabled="isSavingParsed"
+              class="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               @click="saveTransaction(scanResult!, 'ai-image', scanDateEdit)"
             >
-              Confirm & Save
+              {{ isSavingParsed ? 'Saving…' : 'Confirm & Save' }}
             </button>
           </div>
         </div>

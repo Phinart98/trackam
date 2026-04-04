@@ -68,28 +68,36 @@ async function changeCurrency(newCode: string) {
   const config = useRuntimeConfig()
   const apiBase = config.public.apiBaseUrl as string
 
+  if (apiBase && tx.transactions.length) {
+    const doConvert = await confirm(
+      `Convert existing amounts from ${oldCode} to ${newCode}?`,
+      { message: 'This will update all transaction amounts using today\'s exchange rate.', confirmLabel: 'Convert' }
+    )
+    if (doConvert) {
+      try {
+        // Optimistic update — revert on failure
+        selectedCurrency.value = newCode
+        scheduleProfileSave()
+        const token = await getAuthToken()
+        await $fetch(`${apiBase}/api/transactions/convert-currency?from=${oldCode}&to=${newCode}`, {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        })
+        await tx.fetchFromApi(apiBase)
+        toast.add({ title: `Amounts converted to ${newCode}`, color: 'success' })
+      } catch {
+        selectedCurrency.value = oldCode
+        if (saveTimer) clearTimeout(saveTimer)
+        scheduleProfileSave()
+        toast.add({ title: 'Conversion failed', description: 'Amounts were not converted. Try again.', color: 'error' })
+      }
+      return
+    }
+  }
+
+  // No conversion needed (or user declined) — just update currency
   selectedCurrency.value = newCode
   scheduleProfileSave()
-
-  if (!apiBase || !tx.transactions.length) return
-
-  const doConvert = await confirm(
-    `Convert existing amounts from ${oldCode} to ${newCode}?`,
-    { message: 'This will update all transaction amounts using today\'s exchange rate.', confirmLabel: 'Convert' }
-  )
-  if (!doConvert) return
-
-  try {
-    const token = await getAuthToken()
-    await $fetch(`${apiBase}/api/transactions/convert-currency?from=${oldCode}&to=${newCode}`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    })
-    await tx.fetchFromApi(apiBase)
-    toast.add({ title: `Amounts converted to ${newCode}`, color: 'success' })
-  } catch {
-    toast.add({ title: 'Conversion failed', description: 'Amounts were not converted. Try again.', color: 'error' })
-  }
 }
 
 const showCurrencyPicker = ref(false)
@@ -152,6 +160,8 @@ async function confirmClearData() {
 
   tx.$reset()
   chat.clearChat()
+  useGoalStore().$reset()
+  useCategoryStore().$reset()
   toast.add({ title: 'Data cleared', color: 'neutral' })
 }
 

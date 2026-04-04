@@ -172,7 +172,7 @@ export const useTransactionStore = defineStore('transactions', {
           // Only remove locally if API returned 404 (already deleted remotely)
           if ((err as { statusCode?: number })?.statusCode !== 404) {
             console.warn('Failed to delete from API:', err)
-            return
+            throw err // Let the caller show an error toast
           }
         }
         this.transactions = this.transactions.filter(t => t.id !== id)
