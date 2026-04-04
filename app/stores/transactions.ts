@@ -135,28 +135,19 @@ export const useTransactionStore = defineStore('transactions', {
       }
     },
 
-    /** Save a transaction — to API if available, always to local store. */
+    /** Save a transaction to the API. Throws on failure so callers can show an error. */
     async saveTransaction(tx: Omit<Transaction, 'id'>) {
       const config = useRuntimeConfig()
       const apiBaseUrl = config.public.apiBaseUrl as string
+      if (!apiBaseUrl) throw new Error('No API configured')
 
-      if (apiBaseUrl) {
-        try {
-          const token = await getAuthToken()
-          const saved = await $fetch<Transaction>(`${apiBaseUrl}/api/transactions`, {
-            method: 'POST',
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-            body: tx
-          })
-          this.transactions.unshift(saved)
-          return
-        } catch (err) {
-          console.warn('Failed to save to API, saving locally:', err)
-        }
-      }
-
-      // Fallback: save locally
-      this.addTransaction(tx)
+      const token = await getAuthToken()
+      const saved = await $fetch<Transaction>(`${apiBaseUrl}/api/transactions`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: tx
+      })
+      this.transactions.unshift(saved)
     },
 
     /** Delete a transaction — from API if available, always from local store. */

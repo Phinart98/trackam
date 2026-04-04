@@ -4,10 +4,8 @@ const tx = useTransactionStore()
 const catStore = useCategoryStore()
 const goalStore = useGoalStore()
 
-// Await init so session state is resolved before checking isLoggedIn
-await auth.init()
-
 // Load data once when login state becomes true — watch prevents duplicate calls on token refresh
+// Note: auth.init() is called in plugins/auth.client.ts before middleware runs
 watch(() => auth.isLoggedIn, (loggedIn) => {
   if (loggedIn) {
     const config = useRuntimeConfig()

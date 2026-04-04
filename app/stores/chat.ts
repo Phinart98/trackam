@@ -2,7 +2,8 @@ import type { ChatMessage } from '~/types'
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
-    messages: [] as ChatMessage[]
+    messages: [] as ChatMessage[],
+    sessionId: null as string | null
   }),
 
   actions: {
@@ -18,10 +19,16 @@ export const useChatStore = defineStore('chat', {
       const msg = this.messages.find(m => m.id === id)
       if (msg) msg.content = content
     },
+    setSessionId(id: string) {
+      this.sessionId = id
+    },
     clearChat() {
       this.messages = []
+      this.sessionId = null
     }
   },
 
-  persist: true
+  persist: {
+    pick: ['messages']
+  }
 })

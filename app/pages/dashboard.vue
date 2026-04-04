@@ -65,19 +65,19 @@ function animateCounter(target: number, setter: (v: number) => void, duration = 
 }
 
 onMounted(() => {
-  animateCounter(tx.balance, v => (displayBalance.value = v))
-  animateCounter(tx.totalIncome, v => (displayIncome.value = v))
-  animateCounter(tx.totalExpenses, v => (displayExpenses.value = v))
-  refreshInsightIfStale()
+  // Persisted store data already in display refs — animation fires from watch below.
+  // refreshInsightIfStale also runs from the watch; call here only for the zero-data case
+  // (no transactions → watch never fires → insight prompt never appears).
+  if (tx.transactions.length === 0) refreshInsightIfStale()
 })
 
-// Keep display in sync when data loads after mount (no re-animation)
+// Animate when data changes after mount (API fetch, new transaction added)
 watch(
   () => [tx.balance, tx.totalIncome, tx.totalExpenses] as const,
   ([b, i, e]) => {
-    displayBalance.value = b
-    displayIncome.value = i
-    displayExpenses.value = e
+    animateCounter(b, v => (displayBalance.value = v))
+    animateCounter(i, v => (displayIncome.value = v))
+    animateCounter(e, v => (displayExpenses.value = v))
     refreshInsightIfStale()
   }
 )

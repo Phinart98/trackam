@@ -52,21 +52,25 @@ export const useAuthStore = defineStore('auth', {
             name: (meta.name as string) || userEmail.split('@')[0] || 'User',
             email: userEmail
           }
+          // Read onboarded from Supabase user_metadata — available immediately, no backend call needed.
+          // This is set by saveOnboardedFlag() when the user completes onboarding.
+          const metaOnboarded = meta.onboarded === true
           this.profile = {
             ...fallback,
             currency: 'GHS',
             businessType: '',
-            onboarded: false
+            onboarded: metaOnboarded
           }
 
-          // Blocking fetch with 3s timeout — same pattern as login() — so middleware sees correct onboarded state
+          // Blocking fetch with 5s timeout to load full profile (currency, businessType, etc.)
+          // onboarded routing is already correct from metadata above
           const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
           if (apiBase) {
             try {
               const token = await getAuthToken()
               if (token) {
                 const timeout = new Promise<never>((_, reject) =>
-                  setTimeout(() => reject(new Error('timeout')), 3000)
+                  setTimeout(() => reject(new Error('timeout')), 5000)
                 )
                 const server = await Promise.race([
                   $fetch<Record<string, unknown>>(`${apiBase}/api/profile`, {
@@ -76,10 +80,21 @@ export const useAuthStore = defineStore('auth', {
                 ])
                 if (server) {
                   this.profile = mapServerProfile(server, fallback)
+                  // Backfill: if backend says onboarded but metadata doesn't have the flag yet
+                  // (users who onboarded before saveOnboardedFlag() was added), write it now.
+                  // After this runs once, all future sessions use metadata — no backend needed.
+                  if (this.profile.onboarded && !metaOnboarded) {
+                    this.saveOnboardedFlag().catch(() => {})
+                  }
                 }
               }
             } catch {
-              // timeout or unreachable — keep fallback (persisted profile preserves onboarded)
+              // Backend unreachable or cold-start timeout.
+              // A user in this path has a valid Supabase session but no Pinia profile —
+              // they're a returning user on a new device or cleared localStorage.
+              // New users always have a Pinia profile set by signUp(), so they never reach here.
+              // Default to onboarded:true to avoid re-showing onboarding to returning users.
+              if (this.profile) this.profile.onboarded = true
             }
           }
         }
@@ -100,7 +115,7 @@ export const useAuthStore = defineStore('auth', {
               email: session.user.email || '',
               currency: 'GHS',
               businessType: '',
-              onboarded: false
+              onboarded: meta.onboarded === true
             }
           }
         } else if (event === 'SIGNED_OUT') {
@@ -144,24 +159,23 @@ export const useAuthStore = defineStore('auth', {
       const meta = user?.user_metadata ?? {}
       const userEmail = user?.email || email
       // For returning users, Pinia persist already has the correct profile in
-      // localStorage (including onboarded:true). Use it as the cold-start fallback
-      // so a backend timeout never resets onboarding for a returning user.
+      // localStorage (including onboarded:true). Use it as the cold-start fallback.
+      // Also check Supabase user_metadata.onboarded — set by saveOnboardedFlag() on completion.
       const persisted = this.profile?.email === userEmail ? this.profile : null
       const fallback: UserProfile = {
         name: (meta.name as string) || email.split('@')[0] || 'User',
         email: userEmail,
         currency: persisted?.currency || 'GHS',
         businessType: persisted?.businessType || '',
-        onboarded: persisted?.onboarded ?? false
+        onboarded: (meta.onboarded === true) || (persisted?.onboarded ?? false)
       }
 
       const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
       if (apiBase) {
         try {
           const token = await getAuthToken()
-          // Race the fetch against a 3-second timeout to avoid blocking on cold starts
           const timeout = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('timeout')), 3000)
+            setTimeout(() => reject(new Error('timeout')), 5000)
           )
           const server = await Promise.race([
             $fetch<Record<string, unknown>>(`${apiBase}/api/profile`, {
@@ -170,8 +184,12 @@ export const useAuthStore = defineStore('auth', {
             timeout
           ])
           this.profile = mapServerProfile(server, { name: fallback.name, email: fallback.email })
+          // Backfill metadata for users who onboarded before saveOnboardedFlag() was added
+          if (this.profile.onboarded && meta.onboarded !== true) {
+            this.saveOnboardedFlag().catch(() => {})
+          }
         } catch {
-          // Cold start timeout — fall back to persisted profile (preserves onboarded state)
+          // Cold start timeout — fall back to fallback (onboarded already correct from metadata + persisted)
           this.profile = fallback
         }
       } else {
@@ -217,6 +235,20 @@ export const useAuthStore = defineStore('auth', {
         currency: 'GHS',
         businessType: '',
         onboarded: false
+      }
+    },
+
+    /**
+     * Write onboarded:true into Supabase user_metadata so it survives cleared localStorage.
+     * Called alongside saveProfile() when the user completes onboarding.
+     */
+    async saveOnboardedFlag() {
+      if (!this.useRealAuth) return
+      try {
+        const supabase = useSupabase()
+        await supabase.auth.updateUser({ data: { onboarded: true } })
+      } catch {
+        // Non-critical — onboarded is also stored in the backend profile
       }
     },
 

@@ -11,6 +11,7 @@ const selectedCurrency = ref('GHS')
 const selectedBusinessType = ref('')
 const customBusinessName = ref('')
 const monthlyBudget = ref('')
+const isSaving = ref(false)
 
 const resolvedBusinessType = computed(() =>
   selectedBusinessType.value === 'other' && customBusinessName.value.trim()
@@ -18,15 +19,20 @@ const resolvedBusinessType = computed(() =>
     : selectedBusinessType.value
 )
 
-function finish() {
+async function finish() {
+  if (isSaving.value) return
+  isSaving.value = true
   auth.completeOnboarding(
     selectedCurrency.value,
     resolvedBusinessType.value,
     monthlyBudget.value ? parseFloat(monthlyBudget.value) : undefined
   )
-  // Fire-and-forget — saveProfile reads from the updated auth.profile.
-  // Do NOT await: that's what caused the slow "Let's Go" (backend cold start blocking nav).
-  auth.saveProfile()
+  // Wait up to 6s for profile + Supabase metadata to save, then navigate regardless.
+  // The metadata write ensures the user won't see onboarding again on a fresh session.
+  await Promise.race([
+    Promise.all([auth.saveProfile(), auth.saveOnboardedFlag()]),
+    new Promise<void>(r => setTimeout(r, 6000))
+  ])
   navigateTo('/dashboard')
 }
 </script>
@@ -188,19 +194,22 @@ function finish() {
           Back
         </button>
         <button
-          class="flex-[2] py-4 rounded-2xl bg-emerald-500 text-white font-bold text-[15px] shadow-lg shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          :disabled="isSaving"
+          class="flex-[2] py-4 rounded-2xl bg-emerald-500 text-white font-bold text-[15px] shadow-lg shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-80 flex items-center justify-center gap-2"
           @click="finish"
         >
           <UIcon
-            name="i-lucide-check-circle"
+            :name="isSaving ? 'i-lucide-loader-circle' : 'i-lucide-check-circle'"
             class="text-lg"
+            :class="isSaving ? 'animate-spin' : ''"
           />
-          Let's Go!
+          {{ isSaving ? 'Saving…' : "Let's Go!" }}
         </button>
       </div>
 
       <button
-        class="w-full text-center text-sm text-slate-400 mt-4 hover:text-slate-600"
+        :disabled="isSaving"
+        class="w-full text-center text-sm text-slate-400 mt-4 hover:text-slate-600 disabled:opacity-40"
         @click="finish"
       >
         Skip for now

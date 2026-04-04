@@ -108,6 +108,7 @@ export const useAI = () => {
   const apiBaseUrl = config.public.apiBaseUrl as string
   const useRealBackend = !!apiBaseUrl
   const auth = useAuthStore()
+  const chat = useChatStore()
 
   const parseText = async (input: string): Promise<ParsedTransaction> => {
     if (useRealBackend) {
@@ -156,8 +157,10 @@ export const useAI = () => {
     if (useRealBackend) {
       const res = await apiFetch<{ reply: string, sessionId: string }>(apiBaseUrl, '/api/ai/advisor', {
         question,
-        context
+        context,
+        sessionId: chat.sessionId
       })
+      chat.setSessionId(res.sessionId)
       return res.reply
     }
     await delay(1200 + Math.random() * 800)

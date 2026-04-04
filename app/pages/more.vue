@@ -62,6 +62,63 @@ onUnmounted(() => {
 
 const showCurrencyPicker = ref(false)
 
+// ── Export ────────────────────────────────────────────────────────────────────
+const isExportingData = ref(false)
+
+async function exportData() {
+  isExportingData.value = true
+  try {
+    const config = useRuntimeConfig()
+    const apiBaseUrl = config.public.apiBaseUrl as string
+    const token = await getAuthToken()
+    const data = await $fetch<Record<string, unknown>>(`${apiBaseUrl}/api/user/export`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `trackam-data-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.add({ title: 'Data exported', description: 'Your data has been downloaded as JSON.', color: 'success' })
+  } catch {
+    toast.add({ title: 'Export failed', description: 'Could not download your data. Try again.', color: 'error' })
+  } finally {
+    isExportingData.value = false
+  }
+}
+
+function exportCsv() {
+  const transactions = tx.sorted
+  if (!transactions.length) {
+    toast.add({ title: 'No transactions', description: 'Add some transactions first.', color: 'neutral' })
+    return
+  }
+  const header = 'Date,Type,Category,Description,Amount,Currency,Source,Vendor'
+  const rows = transactions.map(t =>
+    [
+      t.date.slice(0, 10),
+      t.type,
+      t.category,
+      `"${t.description.replace(/"/g, '""')}"`,
+      t.amount.toFixed(2),
+      t.currency,
+      t.source,
+      t.vendor ? `"${t.vendor.replace(/"/g, '""')}"` : ''
+    ].join(',')
+  )
+  const csv = [header, ...rows].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `trackam-transactions-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  toast.add({ title: 'CSV downloaded', description: `${transactions.length} transactions exported.`, color: 'success' })
+}
+
 // ── Danger zone ───────────────────────────────────────────────────────────────
 const { confirm } = useConfirm()
 
@@ -333,24 +390,57 @@ function logout() {
         Data
       </p>
       <div class="bg-white rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-50">
-        <!-- Export PDF (coming soon) -->
-        <div class="flex items-center gap-3 px-4 py-3.5 opacity-50">
-          <span class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+        <!-- Export JSON -->
+        <button
+          class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left disabled:opacity-60"
+          :disabled="isExportingData"
+          @click="exportData"
+        >
+          <span class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
             <UIcon
-              name="i-lucide-file-down"
-              class="text-slate-500 text-base"
+              :name="isExportingData ? 'i-lucide-loader-circle' : 'i-lucide-database'"
+              class="text-blue-500 text-base"
+              :class="isExportingData ? 'animate-spin' : ''"
             />
           </span>
           <div class="flex-1">
             <p class="text-sm font-semibold text-slate-800">
-              Export PDF Report
+              {{ isExportingData ? 'Exporting…' : 'Export My Data (JSON)' }}
             </p>
             <p class="text-xs text-slate-400">
-              Download a financial summary
+              Full data dump — transactions, goals, profile
             </p>
           </div>
-          <span class="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full shrink-0">Soon</span>
-        </div>
+          <UIcon
+            name="i-lucide-download"
+            class="text-slate-400 text-sm shrink-0"
+          />
+        </button>
+
+        <!-- Export CSV -->
+        <button
+          class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left"
+          @click="exportCsv"
+        >
+          <span class="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+            <UIcon
+              name="i-lucide-file-spreadsheet"
+              class="text-emerald-500 text-base"
+            />
+          </span>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-slate-800">
+              Export Transactions (CSV)
+            </p>
+            <p class="text-xs text-slate-400">
+              Open in Excel, Google Sheets, or Numbers
+            </p>
+          </div>
+          <UIcon
+            name="i-lucide-download"
+            class="text-slate-400 text-sm shrink-0"
+          />
+        </button>
 
         <!-- Clear data -->
         <button

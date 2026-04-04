@@ -28,6 +28,38 @@ function startConfidenceAnimation(target: number, counter: Ref<number>): ReturnT
   return id
 }
 
+// --- Voice (MediaRecorder → Groq Whisper) ---
+const { supported: voiceSupported, isRecording, isTranscribing, start: startRecording, stop: stopRecording, abort: abortRecording } = useVoice()
+const runtimeConfig = useRuntimeConfig()
+const textFromVoice = ref(false) // true when textInput was populated by voice transcription
+
+async function toggleVoice() {
+  if (isRecording.value) {
+    try {
+      const transcript = await stopRecording(runtimeConfig.public.apiBaseUrl as string)
+      if (transcript?.trim()) {
+        textInput.value = transcript
+        textFromVoice.value = true
+      } else {
+        toast.add({ title: 'No speech detected', description: 'Nothing was transcribed. Try speaking more clearly.', color: 'warning' })
+      }
+    } catch {
+      toast.add({ title: 'Transcription failed', description: 'Couldn\'t process the audio. Try again.', color: 'error' })
+    }
+    return
+  }
+  try {
+    await startRecording()
+  } catch (e: unknown) {
+    const name = (e as { name?: string })?.name
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      toast.add({ title: 'Microphone blocked', description: 'Allow microphone access in your browser settings to use voice input.', color: 'error' })
+    } else {
+      toast.add({ title: 'Microphone unavailable', description: 'Could not start recording. Check your device microphone.', color: 'error' })
+    }
+  }
+}
+
 // --- Text tab ---
 const textInput = ref('')
 const isParsing = ref(false)
@@ -76,6 +108,7 @@ onUnmounted(() => {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
   if (textConfidenceTimer) clearInterval(textConfidenceTimer)
   if (scanConfidenceTimer) clearInterval(scanConfidenceTimer)
+  abortRecording()
 })
 
 async function handleScan(file: File) {
@@ -95,6 +128,7 @@ async function handleScan(file: File) {
 }
 
 // --- Manual tab ---
+const isSavingManual = ref(false)
 const manualType = ref<'income' | 'expense'>('expense')
 const manualAmount = ref('')
 const manualCategory = ref('')
@@ -105,7 +139,7 @@ const manualCategories = computed(() =>
 )
 
 // --- Save helpers ---
-async function saveTransaction(result: ParsedTransaction, source: 'ai-text' | 'ai-image' | 'manual', dateOverride?: string) {
+async function saveTransaction(result: ParsedTransaction, source: 'ai-text' | 'ai-image' | 'ai-voice' | 'manual', dateOverride?: string) {
   await tx.saveTransaction({
     type: result.type,
     amount: result.amount,
@@ -124,17 +158,24 @@ async function saveTransaction(result: ParsedTransaction, source: 'ai-text' | 'a
 async function saveManual() {
   const amount = parseFloat(manualAmount.value)
   if (!manualCategory.value || !manualDescription.value || !isFinite(amount) || amount <= 0) return
-  await tx.saveTransaction({
-    type: manualType.value,
-    amount,
-    currency: auth.currency,
-    category: manualCategory.value,
-    description: manualDescription.value,
-    date: manualDate.value,
-    source: 'manual'
-  })
-  toast.add({ title: 'Transaction saved', color: 'success' })
-  navigateTo('/dashboard')
+  isSavingManual.value = true
+  try {
+    await tx.saveTransaction({
+      type: manualType.value,
+      amount,
+      currency: auth.currency,
+      category: manualCategory.value,
+      description: manualDescription.value,
+      date: manualDate.value,
+      source: 'manual'
+    })
+    toast.add({ title: 'Transaction saved', color: 'success' })
+    navigateTo('/dashboard')
+  } catch {
+    toast.add({ title: 'Save failed', description: 'Could not save transaction. Please try again.', color: 'error' })
+  } finally {
+    isSavingManual.value = false
+  }
 }
 
 const today = new Date().toISOString().slice(0, 10)
@@ -186,19 +227,69 @@ const confidenceColor = (score: number) =>
         class="space-y-4"
       >
         <div>
-          <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2">
-            Describe your transaction
-          </label>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+              Describe your transaction
+            </label>
+            <!-- Mic button: tap to start recording, tap again to stop & transcribe -->
+            <button
+              v-if="voiceSupported"
+              type="button"
+              :disabled="isTranscribing"
+              class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+              :class="isRecording
+                ? 'bg-red-50 text-red-500 ring-2 ring-red-200'
+                : isTranscribing
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-slate-100 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600'"
+              :title="isRecording ? 'Tap to stop' : isTranscribing ? 'Processing…' : 'Speak your transaction'"
+              @click="toggleVoice"
+            >
+              <!-- Animated waveform while recording -->
+              <span
+                v-if="isRecording"
+                class="waveform"
+                aria-hidden="true"
+              >
+                <span class="bar" style="--delay:0s" />
+                <span class="bar" style="--delay:0.15s" />
+                <span class="bar" style="--delay:0.3s" />
+                <span class="bar" style="--delay:0.45s" />
+              </span>
+              <!-- Spinner while Whisper processes -->
+              <UIcon
+                v-else-if="isTranscribing"
+                name="i-lucide-loader-circle"
+                class="text-sm animate-spin"
+              />
+              <!-- Idle state -->
+              <UIcon
+                v-else
+                name="i-lucide-mic"
+                class="text-sm"
+              />
+              <span>{{ isRecording ? 'Stop' : isTranscribing ? 'Transcribing…' : 'Speak' }}</span>
+            </button>
+          </div>
           <textarea
             v-model="textInput"
             rows="4"
-            placeholder="e.g. Bought 3 bags of rice 150 cedis each at Makola Market"
-            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 resize-none"
+            :placeholder="isRecording
+              ? 'Listening… speak your transaction'
+              : isTranscribing
+                ? 'Processing audio…'
+                : 'e.g. Bought 3 bags of rice 150 cedis each at Makola Market'"
+            class="w-full rounded-xl border bg-white px-4 py-3 text-base text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 resize-none transition-colors"
+            :class="isRecording
+              ? 'border-red-300 bg-red-50/20 focus:border-red-400 focus:ring-red-400/20'
+              : isTranscribing
+                ? 'border-slate-200 bg-slate-50 opacity-75'
+                : 'border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20'"
           />
         </div>
 
         <button
-          :disabled="!textInput.trim() || isParsing"
+          :disabled="!textInput.trim() || isParsing || isRecording || isTranscribing"
           class="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold text-[15px] shadow-lg shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           @click="handleParseText"
         >
@@ -307,7 +398,7 @@ const confidenceColor = (score: number) =>
 
           <button
             class="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all"
-            @click="saveTransaction(parsedResult!, 'ai-text', parsedDateEdit)"
+            @click="saveTransaction(parsedResult!, textFromVoice ? 'ai-voice' : 'ai-text', parsedDateEdit)"
           >
             Confirm & Save
           </button>
@@ -544,13 +635,41 @@ const confidenceColor = (score: number) =>
         </div>
 
         <button
-          :disabled="!manualAmount || !manualCategory || !manualDescription"
-          class="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold text-[15px] shadow-lg shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+          :disabled="!manualAmount || !manualCategory || !manualDescription || isSavingManual"
+          class="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold text-[15px] shadow-lg shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           @click="saveManual"
         >
-          Save Transaction
+          <UIcon
+            v-if="isSavingManual"
+            name="i-lucide-loader-circle"
+            class="animate-spin text-lg"
+          />
+          {{ isSavingManual ? 'Saving…' : 'Save Transaction' }}
         </button>
       </div>
     </div><!-- /max-w-xl -->
   </div>
 </template>
+
+<style scoped>
+/* Waveform animation — shown while MediaRecorder is capturing audio */
+.waveform {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+
+.waveform .bar {
+  width: 3px;
+  background: currentColor;
+  border-radius: 2px;
+  animation: waveBar 0.8s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes waveBar {
+  0%, 100% { height: 4px; }
+  50%       { height: 14px; }
+}
+</style>

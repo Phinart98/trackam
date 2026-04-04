@@ -2,7 +2,7 @@
 definePageMeta({ layout: 'auth' })
 
 const features = [
-  { icon: 'i-lucide-message-square-text', title: 'Speak naturally', desc: 'Type "bought 3 bags rice 150 cedis" — AI handles the rest.', color: 'bg-emerald-50 border-emerald-100', iconColor: 'text-emerald-600' },
+  { icon: 'i-lucide-mic', title: 'Speak or type', desc: 'Say or type "bought 3 bags rice 150 cedis" — AI understands Africa\'s informal language.', color: 'bg-emerald-50 border-emerald-100', iconColor: 'text-emerald-600' },
   { icon: 'i-lucide-scan-line', title: 'Snap receipts & MoMo', desc: 'Photograph any receipt or MoMo screenshot. Vision AI reads it instantly.', color: 'bg-amber-50 border-amber-100', iconColor: 'text-amber-600' },
   { icon: 'i-lucide-brain', title: 'Your AI advisor', desc: 'Get financial advice grounded in your actual transactions — not generic tips.', color: 'bg-violet-50 border-violet-100', iconColor: 'text-violet-600' }
 ]
