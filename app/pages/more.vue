@@ -53,16 +53,28 @@ const budget = computed({
   set: (val) => { if (auth.profile) auth.profile.monthlyBudget = val ? parseFloat(val) : undefined }
 })
 
+const budgetSaved = ref(false)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+let budgetSavedTimer: ReturnType<typeof setTimeout> | null = null
 function scheduleProfileSave() {
   if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => auth.saveProfile(), 1500)
+  saveTimer = setTimeout(async () => {
+    const saved = await auth.saveProfile()
+    if (saved) {
+      budgetSaved.value = true
+      if (budgetSavedTimer) clearTimeout(budgetSavedTimer)
+      budgetSavedTimer = setTimeout(() => { budgetSaved.value = false }, 2000)
+    } else {
+      toast.add(SAVE_FAILURE_TOAST)
+    }
+  }, 1500)
 }
 watch(budget, (newBudget, oldBudget) => {
   if (newBudget !== oldBudget) scheduleProfileSave()
 })
 onUnmounted(() => {
   if (saveTimer) clearTimeout(saveTimer)
+  if (budgetSavedTimer) clearTimeout(budgetSavedTimer)
 })
 
 async function changeCurrency(newCode: string) {
@@ -87,6 +99,17 @@ async function changeCurrency(newCode: string) {
           method: 'POST',
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         })
+        // Convert monthly budget at today's rate (transactions use historical rates)
+        if (auth.profile?.monthlyBudget) {
+          try {
+            const fx = await $fetch<{ rate: number }>(`${apiBase}/api/fx/rate?from=${oldCode}&to=${newCode}`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {}
+            })
+            auth.profile.monthlyBudget = Math.round(auth.profile.monthlyBudget * Number(fx.rate))
+          } catch {
+            // Rate unavailable — leave budget unchanged, user can update manually
+          }
+        }
         selectedCurrency.value = newCode
         const saved = await auth.saveProfile()
         if (!saved) toast.add(SAVE_FAILURE_TOAST)
@@ -391,7 +414,23 @@ function logout() {
 
         <!-- Monthly budget -->
         <div class="px-4 py-3.5">
-          <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-2">Monthly Budget</label>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Monthly Budget</label>
+            <Transition
+              enter-active-class="transition-opacity duration-200"
+              enter-from-class="opacity-0"
+              leave-active-class="transition-opacity duration-500"
+              leave-to-class="opacity-0"
+            >
+              <span
+                v-if="budgetSaved"
+                class="flex items-center gap-1 text-[11px] font-semibold text-emerald-600"
+              >
+                <UIcon name="i-lucide-check" class="text-xs" />
+                Saved
+              </span>
+            </Transition>
+          </div>
           <div class="relative">
             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">
               {{ getCurrencySymbol(auth.currency) }}

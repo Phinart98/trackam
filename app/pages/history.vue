@@ -14,14 +14,24 @@ const { confirm } = useConfirm()
 
 const searchQuery = ref('')
 const activeFilter = ref<Filter>('all')
+const dateFrom = ref('')
+const dateTo = ref('')
 const expandedId = ref<string | null>(null)
 const visibleCount = ref(PAGE_SIZE)
 const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
+const today = new Date().toISOString().slice(0, 10)
 
 function toggleExpand(id: string) {
   expandedId.value = expandedId.value === id ? null : id
 }
+
+function clearDateFilter() {
+  dateFrom.value = ''
+  dateTo.value = ''
+}
+
+const hasDateFilter = computed(() => !!(dateFrom.value || dateTo.value))
 
 const filtered = computed(() => {
   let list = tx.sorted
@@ -34,11 +44,13 @@ const filtered = computed(() => {
       || (t.vendor?.toLowerCase().includes(q) ?? false)
     )
   }
+  if (dateFrom.value) list = list.filter(t => t.date.slice(0, 10) >= dateFrom.value)
+  if (dateTo.value) list = list.filter(t => t.date.slice(0, 10) <= dateTo.value)
   return list
 })
 
 // Reset to first page whenever filters change
-watch([searchQuery, activeFilter], () => {
+watch([searchQuery, activeFilter, dateFrom, dateTo], () => {
   visibleCount.value = PAGE_SIZE
   expandedId.value = null
 })
@@ -102,7 +114,7 @@ onUnmounted(() => observer?.disconnect())
     </h1>
 
     <!-- Search + filters row -->
-    <div class="flex flex-col sm:flex-row gap-3 mb-4">
+    <div class="flex flex-col sm:flex-row gap-3 mb-3">
       <div class="relative flex-1">
         <UIcon
           name="i-lucide-search"
@@ -132,6 +144,43 @@ onUnmounted(() => observer?.disconnect())
           >{{ f.count }}</span>
         </button>
       </div>
+    </div>
+
+    <!-- Date range filter -->
+    <div class="flex items-center gap-2 mb-4">
+      <UIcon
+        name="i-lucide-calendar"
+        class="text-slate-400 text-sm shrink-0"
+      />
+      <div class="flex items-center gap-1.5 flex-1">
+        <input
+          v-model="dateFrom"
+          type="date"
+          :max="dateTo || today"
+          class="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/30"
+          title="From date"
+        >
+        <span class="text-xs text-slate-400 shrink-0">to</span>
+        <input
+          v-model="dateTo"
+          type="date"
+          :min="dateFrom || undefined"
+          :max="today"
+          class="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/30"
+          title="To date"
+        >
+      </div>
+      <button
+        v-if="hasDateFilter"
+        class="text-slate-400 hover:text-slate-600 transition-colors shrink-0"
+        title="Clear date filter"
+        @click="clearDateFilter"
+      >
+        <UIcon
+          name="i-lucide-x"
+          class="text-sm"
+        />
+      </button>
     </div>
 
     <!-- Empty state -->
