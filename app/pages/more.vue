@@ -63,7 +63,9 @@ function scheduleProfileSave() {
     if (saved) {
       budgetSaved.value = true
       if (budgetSavedTimer) clearTimeout(budgetSavedTimer)
-      budgetSavedTimer = setTimeout(() => { budgetSaved.value = false }, 2000)
+      budgetSavedTimer = setTimeout(() => {
+        budgetSaved.value = false
+      }, 2000)
     } else {
       toast.add(SAVE_FAILURE_TOAST)
     }
