@@ -90,6 +90,19 @@ async function deleteTransaction(id: string) {
   }
 }
 
+function sourceBadgeClass(source?: string): string {
+  if (source === 'ai-text' || source === 'ai-voice') return 'bg-violet-50 text-violet-600'
+  if (source === 'ai-image') return 'bg-amber-50 text-amber-600'
+  return 'bg-slate-100 text-slate-500'
+}
+
+function sourceLabel(source?: string): string {
+  if (source === 'ai-text') return 'AI Text'
+  if (source === 'ai-image') return 'AI Scan'
+  if (source === 'ai-voice') return 'AI Voice'
+  return 'Manual'
+}
+
 onMounted(() => {
   observer = new IntersectionObserver(
     (entries) => { if (entries[0]?.isIntersecting && hasMore.value) loadMore() },
@@ -275,9 +288,9 @@ onUnmounted(() => observer?.disconnect())
               <td class="px-4 py-3">
                 <span
                   class="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                  :class="t.source === 'ai-text' || t.source === 'ai-voice' ? 'bg-violet-50 text-violet-600' : t.source === 'ai-image' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'"
+                  :class="sourceBadgeClass(t.source)"
                 >
-                  {{ t.source === 'ai-text' ? 'AI Text' : t.source === 'ai-image' ? 'AI Scan' : t.source === 'ai-voice' ? 'AI Voice' : 'Manual' }}
+                  {{ sourceLabel(t.source) }}
                 </span>
               </td>
               <td class="px-4 py-3 text-right">
@@ -401,9 +414,9 @@ onUnmounted(() => observer?.disconnect())
                   </span>
                   <span
                     class="text-[11px] font-medium px-2.5 py-1 rounded-full"
-                    :class="t.source === 'ai-text' || t.source === 'ai-voice' ? 'bg-violet-50 text-violet-600' : t.source === 'ai-image' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'"
+                    :class="sourceBadgeClass(t.source)"
                   >
-                    {{ t.source === 'ai-text' ? 'AI Text' : t.source === 'ai-image' ? 'AI Scan' : t.source === 'ai-voice' ? 'AI Voice' : 'Manual' }}
+                    {{ sourceLabel(t.source) }}
                   </span>
                   <span
                     v-if="t.confidence"

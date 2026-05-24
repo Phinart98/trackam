@@ -172,15 +172,15 @@ export const useAuthStore = defineStore('auth', {
       const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
       // Fire transactions in parallel with the profile fetch below; loading guard dedupes.
       if (apiBase) useTransactionStore().fetchFromApi(apiBase)
-      if (apiBase) {
+      const token = apiBase ? await getAuthToken() : null
+      if (apiBase && token) {
         try {
-          const token = await getAuthToken()
           const timeout = new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('timeout')), 5000)
           )
           const server = await Promise.race([
             $fetch<Record<string, unknown>>(`${apiBase}/api/profile`, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {}
+              headers: { Authorization: `Bearer ${token}` }
             }),
             timeout
           ])

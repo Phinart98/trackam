@@ -37,21 +37,9 @@ function findAmountToken(input: string, amount: number): string | null {
   return match?.[0] ?? null
 }
 
-function findCategoryKeyword(input: string, category: string): string | null {
-  const keywords = CATEGORY_KEYWORDS[category]
-  if (!keywords) return null
+function findKeyword(input: string, keywords: string[]): string | null {
   const lower = input.toLowerCase()
   for (const kw of keywords) {
-    const idx = lower.indexOf(kw)
-    if (idx !== -1) return input.slice(idx, idx + kw.length)
-  }
-  return null
-}
-
-function findTypeKeyword(input: string, type: 'income' | 'expense'): string | null {
-  const lower = input.toLowerCase()
-  const list = type === 'income' ? INCOME_KEYWORDS : EXPENSE_KEYWORDS
-  for (const kw of list) {
     const idx = lower.indexOf(kw)
     if (idx !== -1) return input.slice(idx, idx + kw.length)
   }
@@ -67,10 +55,10 @@ export function buildParseBreakdown(input: string, parsed: ParsedTransaction, ca
   const currencyMatch = input.match(CURRENCY_TOKENS)
   if (currencyMatch) tokens.push({ token: currencyMatch[0], field: 'currency', value: currencyMatch[0].toUpperCase() })
 
-  const categoryToken = findCategoryKeyword(input, parsed.category)
+  const categoryToken = findKeyword(input, CATEGORY_KEYWORDS[parsed.category] ?? [])
   if (categoryToken) tokens.push({ token: categoryToken, field: 'category', value: categoryName })
 
-  const typeToken = findTypeKeyword(input, parsed.type)
+  const typeToken = findKeyword(input, parsed.type === 'income' ? INCOME_KEYWORDS : EXPENSE_KEYWORDS)
   if (typeToken) tokens.push({ token: typeToken, field: 'type', value: parsed.type })
 
   return tokens

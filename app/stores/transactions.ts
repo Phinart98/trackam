@@ -159,7 +159,8 @@ export const useTransactionStore = defineStore('transactions', {
         const saved = await $fetch<Transaction>(`${apiBaseUrl}/api/transactions`, {
           method: 'POST',
           headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: tx
+          body: tx,
+          timeout: 15000 // don't let a hung request leave saving stuck true
         })
         this.transactions.unshift(saved)
       } finally {

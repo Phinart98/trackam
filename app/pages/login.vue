@@ -34,7 +34,10 @@ onMounted(async () => {
       onboarded: meta.onboarded === true
     }
   }
-  const onboarded = session.user.user_metadata?.onboarded === true || auth.profile?.onboarded
+  // Only trust the persisted profile's onboarded flag if it belongs to THIS session's user —
+  // a stale profile from a different account on the same browser must not skip onboarding.
+  const profileMatchesSession = auth.profile?.email === (session.user.email || '')
+  const onboarded = session.user.user_metadata?.onboarded === true || (profileMatchesSession && auth.profile?.onboarded === true)
   router.push(onboarded ? '/dashboard' : '/onboarding')
 })
 
@@ -51,7 +54,7 @@ async function submit() {
     // auth.profile may have stale data from a cold-start timeout or CORS failure.
     const supabase = useSupabase()
     const { data: { session } } = await supabase.auth.getSession()
-    const onboarded = session?.user?.user_metadata?.onboarded === true || auth.profile?.onboarded
+    const onboarded = session?.user?.user_metadata?.onboarded === true || auth.profile?.onboarded === true
     router.push(onboarded ? '/dashboard' : '/onboarding')
   } catch (err: unknown) {
     if ((err as { code?: string })?.code === 'confirm_email') {
