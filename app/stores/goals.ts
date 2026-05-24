@@ -49,8 +49,8 @@ export const useGoalStore = defineStore('goals', {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         })
         this.goals = data.map(normalizeGoal)
-      } catch (err) {
-        console.warn('Failed to fetch goals from API:', err)
+      } catch {
+        // Silent: caller falls back to persisted state.
       }
     },
 
@@ -68,8 +68,8 @@ export const useGoalStore = defineStore('goals', {
           })
           this.goals.push(normalizeGoal(saved))
           return normalizeGoal(saved)
-        } catch (err) {
-          console.warn('Failed to save goal to API, saving locally:', err)
+        } catch {
+          // Fall through to local-only save below.
         }
       }
 
@@ -101,8 +101,8 @@ export const useGoalStore = defineStore('goals', {
           })
           Object.assign(goal, normalizeGoal(saved))
           return
-        } catch (err) {
-          console.warn('Failed to update goal on API, updating locally:', err)
+        } catch {
+          // Fall through to local-only update below.
         }
       }
 
@@ -136,10 +136,8 @@ export const useGoalStore = defineStore('goals', {
             headers: token ? { Authorization: `Bearer ${token}` } : {}
           })
         } catch (err: unknown) {
-          if ((err as { statusCode?: number })?.statusCode !== 404) {
-            console.warn('Failed to delete goal from API:', err)
-            return
-          }
+          // 404 means already deleted remotely — proceed with local removal.
+          if ((err as { statusCode?: number })?.statusCode !== 404) return
         }
       }
 

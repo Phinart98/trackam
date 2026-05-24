@@ -2,6 +2,7 @@
 import type { Ref } from 'vue'
 import type { ParsedTransaction } from '~/types'
 import { formatCurrency, getCurrencySymbol, SUPPORTED_CURRENCIES } from '~/utils/formatters'
+import { buildParseBreakdown, type BreakdownToken } from '~/utils/parseBreakdown'
 
 const auth = useAuthStore()
 const tx = useTransactionStore()
@@ -62,20 +63,55 @@ async function toggleVoice() {
 
 // --- Text tab ---
 const textInput = ref('')
+const lastTextInput = ref('')
 const isParsing = ref(false)
 const parsedResult = ref<ParsedTransaction | null>(null)
 const parsedDateEdit = ref('')
 const displayedConfidence = ref(0)
+const textParseElapsedMs = ref<number | null>(null)
+const showTextReasoning = ref(false)
 let textConfidenceTimer: ReturnType<typeof setInterval> | null = null
+
+const textBreakdown = computed<BreakdownToken[]>(() => {
+  if (!parsedResult.value || !lastTextInput.value) return []
+  const catName = catStore.byId(parsedResult.value.category)?.name ?? parsedResult.value.category
+  return buildParseBreakdown(lastTextInput.value, parsedResult.value, catName)
+})
+
+const highlightedTextInput = computed(() => {
+  const input = lastTextInput.value
+  if (!input || textBreakdown.value.length === 0) return [{ text: input, field: null as null | string }]
+  const ranges: { start: number, end: number, field: string }[] = []
+  for (const tok of textBreakdown.value) {
+    const idx = input.toLowerCase().indexOf(tok.token.toLowerCase())
+    if (idx !== -1) ranges.push({ start: idx, end: idx + tok.token.length, field: tok.field })
+  }
+  ranges.sort((a, b) => a.start - b.start)
+  const out: { text: string, field: string | null }[] = []
+  let cursor = 0
+  for (const r of ranges) {
+    if (r.start < cursor) continue // overlapping match — skip
+    if (r.start > cursor) out.push({ text: input.slice(cursor, r.start), field: null })
+    out.push({ text: input.slice(r.start, r.end), field: r.field })
+    cursor = r.end
+  }
+  if (cursor < input.length) out.push({ text: input.slice(cursor), field: null })
+  return out
+})
 
 async function handleParseText() {
   if (!textInput.value.trim()) return
   isParsing.value = true
   parsedResult.value = null
+  showTextReasoning.value = false
+  const started = performance.now()
+  const inputAtStart = textInput.value
   try {
-    const result = await parseText(textInput.value)
+    const result = await parseText(inputAtStart)
     parsedResult.value = result
+    lastTextInput.value = inputAtStart
     parsedDateEdit.value = result.date.slice(0, 10)
+    textParseElapsedMs.value = Math.round(performance.now() - started)
     if (textConfidenceTimer) clearInterval(textConfidenceTimer)
     textConfidenceTimer = startConfidenceAnimation(result.confidence, displayedConfidence)
   } catch {
@@ -93,6 +129,7 @@ const isScanning = ref(false)
 const scanResult = ref<ParsedTransaction | null>(null)
 const scanDateEdit = ref('')
 const scanConfidence = ref(0)
+const scanParseElapsedMs = ref<number | null>(null)
 let scanConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
 function handleFileSelect(e: Event) {
@@ -114,10 +151,12 @@ onUnmounted(() => {
 async function handleScan(file: File) {
   isScanning.value = true
   scanResult.value = null
+  const started = performance.now()
   try {
     const result = await parseImage(file)
     scanResult.value = result
     scanDateEdit.value = result.date.slice(0, 10)
+    scanParseElapsedMs.value = Math.round(performance.now() - started)
     if (scanConfidenceTimer) clearInterval(scanConfidenceTimer)
     scanConfidenceTimer = startConfidenceAnimation(result.confidence, scanConfidence)
   } catch {
@@ -125,6 +164,13 @@ async function handleScan(file: File) {
   } finally {
     isScanning.value = false
   }
+}
+
+const fieldStyles: Record<string, { dot: string, chip: string, text: string, label: string }> = {
+  amount: { dot: 'bg-emerald-500', chip: 'bg-emerald-50 text-emerald-700 ring-emerald-200', text: 'text-emerald-700', label: 'Amount' },
+  currency: { dot: 'bg-blue-500', chip: 'bg-blue-50 text-blue-700 ring-blue-200', text: 'text-blue-700', label: 'Currency' },
+  category: { dot: 'bg-violet-500', chip: 'bg-violet-50 text-violet-700 ring-violet-200', text: 'text-violet-700', label: 'Category' },
+  type: { dot: 'bg-amber-500', chip: 'bg-amber-50 text-amber-700 ring-amber-200', text: 'text-amber-700', label: 'Type' }
 }
 
 // --- Manual tab ---
@@ -180,6 +226,7 @@ async function saveTransaction(result: ParsedTransaction, source: 'ai-text' | 'a
 }
 
 async function saveManual() {
+  if (isSavingManual.value) return
   const rawAmount = parseFloat(manualAmount.value)
   if (!manualCategory.value || !manualDescription.value || !isFinite(rawAmount) || rawAmount <= 0) return
   isSavingManual.value = true
@@ -355,6 +402,26 @@ const confidenceColor = (score: number) =>
           v-if="parsedResult"
           class="rounded-xl border border-slate-200 bg-white p-4 space-y-3"
         >
+          <!-- AI moment: badge + parse latency -->
+          <div class="flex items-center justify-between -mt-1">
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-violet-100">
+              <UIcon name="i-lucide-sparkles" class="text-xs" />
+              AI parsed
+              <span v-if="textParseElapsedMs !== null" class="text-violet-400">· {{ (textParseElapsedMs / 1000).toFixed(1) }}s</span>
+            </span>
+            <button
+              v-if="textBreakdown.length > 0"
+              type="button"
+              class="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-violet-600 transition-colors"
+              :aria-expanded="showTextReasoning"
+              aria-controls="text-reasoning-panel"
+              @click="showTextReasoning = !showTextReasoning"
+            >
+              <UIcon :name="showTextReasoning ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="text-xs" />
+              How I parsed this
+            </button>
+          </div>
+
           <div class="flex items-start justify-between">
             <div>
               <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
@@ -463,10 +530,48 @@ const confidenceColor = (score: number) =>
             </div>
           </div>
 
+          <!-- AI reasoning trace -->
+          <div
+            v-if="showTextReasoning && textBreakdown.length > 0"
+            id="text-reasoning-panel"
+            class="rounded-lg bg-slate-50 ring-1 ring-slate-100 p-3 space-y-2.5"
+          >
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              What I found in your message
+            </p>
+
+            <p class="text-sm leading-relaxed text-slate-700 break-words">
+              <template v-for="(part, i) in highlightedTextInput" :key="i">
+                <span
+                  v-if="part.field"
+                  class="inline-flex items-center rounded px-1 py-0.5 text-[13px] font-semibold ring-1"
+                  :class="fieldStyles[part.field]?.chip"
+                >{{ part.text }}</span>
+                <span v-else>{{ part.text }}</span>
+              </template>
+            </p>
+
+            <ul class="space-y-1">
+              <li
+                v-for="tok in textBreakdown"
+                :key="tok.field + tok.token"
+                class="flex items-start gap-2 text-xs text-slate-600"
+              >
+                <span class="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full" :class="fieldStyles[tok.field]?.dot" />
+                <span>
+                  <span class="font-mono font-medium text-slate-800">"{{ tok.token }}"</span>
+                  <span class="text-slate-400"> → </span>
+                  <span class="font-semibold" :class="fieldStyles[tok.field]?.text">{{ fieldStyles[tok.field]?.label }}</span>
+                  <span class="text-slate-500"> ({{ tok.value }})</span>
+                </span>
+              </li>
+            </ul>
+          </div>
+
           <div class="flex gap-2">
             <button
               class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors"
-              @click="parsedResult = null; textInput = ''; textFromVoice = false"
+              @click="parsedResult = null; textInput = ''; textFromVoice = false; textParseElapsedMs = null; showTextReasoning = false"
             >
               Cancel
             </button>
@@ -535,6 +640,15 @@ const confidenceColor = (score: number) =>
           v-if="scanResult"
           class="rounded-xl border border-slate-200 bg-white p-4 space-y-3"
         >
+          <!-- AI moment: vision badge + parse latency -->
+          <div class="flex items-center -mt-1">
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-violet-100">
+              <UIcon name="i-lucide-scan-eye" class="text-xs" />
+              AI Vision extracted
+              <span v-if="scanParseElapsedMs !== null" class="text-violet-400">· {{ (scanParseElapsedMs / 1000).toFixed(1) }}s</span>
+            </span>
+          </div>
+
           <div class="flex items-start justify-between">
             <div>
               <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">

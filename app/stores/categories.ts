@@ -136,8 +136,8 @@ export const useCategoryStore = defineStore('categories', {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         })
         this.custom = data.map(c => ({ ...c, isDefault: false }))
-      } catch (err) {
-        console.warn('Failed to fetch categories from API:', err)
+      } catch {
+        // Silent: caller falls back to persisted state.
       } finally {
         this.loading = false
       }
@@ -155,8 +155,8 @@ export const useCategoryStore = defineStore('categories', {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           body: { id: cat.id, name: cat.name, icon: cat.icon, color: cat.color, bgColor: cat.bgColor, dotColor: cat.dotColor, type: cat.type, keywords: cat.keywords ?? [] }
         })
-      } catch (err) {
-        console.warn('Failed to sync category to API:', err)
+      } catch {
+        // Local copy still saved; backend will reconcile on next fetch.
       }
     },
 
@@ -171,8 +171,8 @@ export const useCategoryStore = defineStore('categories', {
           method: 'DELETE',
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         })
-      } catch (err) {
-        console.warn('Failed to delete category from API:', err)
+      } catch {
+        // Local copy still removed; backend will reconcile on next fetch.
       }
     }
   },

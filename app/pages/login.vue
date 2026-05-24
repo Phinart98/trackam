@@ -31,10 +31,11 @@ onMounted(async () => {
       email: session.user.email || '',
       currency: 'GHS',
       businessType: '',
-      onboarded: false
+      onboarded: meta.onboarded === true
     }
   }
-  router.push(auth.profile?.onboarded ? '/dashboard' : '/onboarding')
+  const onboarded = session.user.user_metadata?.onboarded === true || auth.profile?.onboarded
+  router.push(onboarded ? '/dashboard' : '/onboarding')
 })
 
 async function submit() {
@@ -46,11 +47,12 @@ async function submit() {
     } else {
       await auth.signUp(email.value, password.value, name.value || undefined)
     }
-    if (!auth.profile?.onboarded) {
-      router.push('/onboarding')
-    } else {
-      router.push('/dashboard')
-    }
+    // Read onboarded directly from Supabase session — the single source of truth.
+    // auth.profile may have stale data from a cold-start timeout or CORS failure.
+    const supabase = useSupabase()
+    const { data: { session } } = await supabase.auth.getSession()
+    const onboarded = session?.user?.user_metadata?.onboarded === true || auth.profile?.onboarded
+    router.push(onboarded ? '/dashboard' : '/onboarding')
   } catch (err: unknown) {
     if ((err as { code?: string })?.code === 'confirm_email') {
       confirmEmailSent.value = true

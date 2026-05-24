@@ -193,11 +193,19 @@ onUnmounted(() => observer?.disconnect())
         class="text-slate-300 text-4xl mb-3"
       />
       <p class="text-sm font-semibold text-slate-500">
-        No transactions found
+        {{ searchQuery || hasDateFilter ? 'No transactions found' : 'No transactions yet' }}
       </p>
       <p class="text-xs text-slate-400 mt-1">
-        {{ searchQuery ? 'Try a different search term' : 'Add your first transaction' }}
+        {{ searchQuery ? 'Try a different search term' : hasDateFilter ? 'Adjust your date range' : 'Start tracking your money with AI' }}
       </p>
+      <NuxtLink
+        v-if="!searchQuery && !hasDateFilter"
+        to="/add"
+        class="inline-flex items-center gap-1.5 mt-4 px-5 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-95 transition-all"
+      >
+        <UIcon name="i-lucide-plus" class="text-base" />
+        Add your first entry
+      </NuxtLink>
     </div>
 
     <template v-else>
@@ -267,9 +275,9 @@ onUnmounted(() => observer?.disconnect())
               <td class="px-4 py-3">
                 <span
                   class="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                  :class="t.source === 'ai-text' ? 'bg-violet-50 text-violet-600' : t.source === 'ai-image' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'"
+                  :class="t.source === 'ai-text' || t.source === 'ai-voice' ? 'bg-violet-50 text-violet-600' : t.source === 'ai-image' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'"
                 >
-                  {{ t.source === 'ai-text' ? 'AI Text' : t.source === 'ai-image' ? 'AI Scan' : 'Manual' }}
+                  {{ t.source === 'ai-text' ? 'AI Text' : t.source === 'ai-image' ? 'AI Scan' : t.source === 'ai-voice' ? 'AI Voice' : 'Manual' }}
                 </span>
               </td>
               <td class="px-4 py-3 text-right">
@@ -393,9 +401,9 @@ onUnmounted(() => observer?.disconnect())
                   </span>
                   <span
                     class="text-[11px] font-medium px-2.5 py-1 rounded-full"
-                    :class="t.source === 'ai-text' ? 'bg-violet-50 text-violet-600' : t.source === 'ai-image' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'"
+                    :class="t.source === 'ai-text' || t.source === 'ai-voice' ? 'bg-violet-50 text-violet-600' : t.source === 'ai-image' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'"
                   >
-                    {{ t.source === 'ai-text' ? 'AI Text' : t.source === 'ai-image' ? 'AI Scan' : 'Manual' }}
+                    {{ t.source === 'ai-text' ? 'AI Text' : t.source === 'ai-image' ? 'AI Scan' : t.source === 'ai-voice' ? 'AI Voice' : 'Manual' }}
                   </span>
                   <span
                     v-if="t.confidence"

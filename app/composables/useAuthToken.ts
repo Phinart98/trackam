@@ -4,11 +4,8 @@ export async function getAuthToken(): Promise<string | null> {
     if (!config.public.supabaseUrl) return null
 
     const supabase = useSupabase()
-    // getSession() with autoRefreshToken:true already handles proactive refresh
-    // internally via a background ticker. Do NOT call refreshSession() manually —
-    // if expires_at is undefined (common right after signup), the old ?? 0 fallback
-    // made it always try to refresh, returning null on any failure and cascading
-    // into 401s on every API request.
+    // autoRefreshToken handles proactive refresh; calling refreshSession() manually
+    // 401s right after signup when expires_at is undefined.
     const { data: { session } } = await supabase.auth.getSession()
     return session?.access_token ?? null
   } catch {

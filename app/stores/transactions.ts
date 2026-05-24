@@ -11,9 +11,11 @@ export const useTransactionStore = defineStore('transactions', {
     transactions: [] as Transaction[],
     chartRange: '1M' as ChartRange,
     loading: false,
+    saving: false,
+    _deletingIds: [] as string[],
     aiInsight: null as string | null,
-    aiInsightAt: 0, // unix timestamp ms when last generated
-    aiInsightTxCount: 0 // transaction count when last generated
+    aiInsightAt: 0,
+    aiInsightTxCount: 0
   }),
 
   getters: {
@@ -137,53 +139,56 @@ export const useTransactionStore = defineStore('transactions', {
           timeout
         ])
         this.transactions = data
-      } catch (err) {
-        // Do not auto-logout on 401 — a token failure (cold start race, network blip)
-        // should not blow away the user's Supabase session. The onAuthStateChange
-        // listener in the auth store handles genuine sign-out events.
-        console.warn('Failed to fetch transactions from API:', err)
+      } catch {
+        // Don't auto-logout on 401: a cold-start or network blip shouldn't blow
+        // away the Supabase session. onAuthStateChange handles real sign-outs.
       } finally {
         this.loading = false
       }
     },
 
-    /** Save a transaction to the API. Throws on failure so callers can show an error. */
     async saveTransaction(tx: Omit<Transaction, 'id'>) {
-      const config = useRuntimeConfig()
-      const apiBaseUrl = config.public.apiBaseUrl as string
-      if (!apiBaseUrl) throw new Error('No API configured')
+      if (this.saving) return
+      this.saving = true
+      try {
+        const config = useRuntimeConfig()
+        const apiBaseUrl = config.public.apiBaseUrl as string
+        if (!apiBaseUrl) throw new Error('No API configured')
 
-      const token = await getAuthToken()
-      const saved = await $fetch<Transaction>(`${apiBaseUrl}/api/transactions`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: tx
-      })
-      this.transactions.unshift(saved)
+        const token = await getAuthToken()
+        const saved = await $fetch<Transaction>(`${apiBaseUrl}/api/transactions`, {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: tx
+        })
+        this.transactions.unshift(saved)
+      } finally {
+        this.saving = false
+      }
     },
 
-    /** Delete a transaction — from API if available, always from local store. */
     async removeTransaction(id: string) {
-      const config = useRuntimeConfig()
-      const apiBaseUrl = config.public.apiBaseUrl as string
+      if (this._deletingIds.includes(id)) return
+      this._deletingIds.push(id)
+      try {
+        const config = useRuntimeConfig()
+        const apiBaseUrl = config.public.apiBaseUrl as string
 
-      if (apiBaseUrl) {
-        try {
-          const token = await getAuthToken()
-          await $fetch(`${apiBaseUrl}/api/transactions/${id}`, {
-            method: 'DELETE',
-            headers: token ? { Authorization: `Bearer ${token}` } : {}
-          })
-        } catch (err: unknown) {
-          // Only remove locally if API returned 404 (already deleted remotely)
-          if ((err as { statusCode?: number })?.statusCode !== 404) {
-            console.warn('Failed to delete from API:', err)
-            throw err // Let the caller show an error toast
+        if (apiBaseUrl) {
+          try {
+            const token = await getAuthToken()
+            await $fetch(`${apiBaseUrl}/api/transactions/${id}`, {
+              method: 'DELETE',
+              headers: token ? { Authorization: `Bearer ${token}` } : {}
+            })
+          } catch (err: unknown) {
+            // 404 means already deleted remotely — safe to remove locally.
+            if ((err as { statusCode?: number })?.statusCode !== 404) throw err
           }
         }
         this.transactions = this.transactions.filter(t => t.id !== id)
-      } else {
-        this.transactions = this.transactions.filter(t => t.id !== id)
+      } finally {
+        this._deletingIds = this._deletingIds.filter(x => x !== id)
       }
     },
 

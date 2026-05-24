@@ -191,8 +191,25 @@ const hasWeeklyData = computed(() =>
       </NuxtLink>
     </div>
 
+    <!-- Loading skeleton: shown during initial API fetch before any data is available -->
+    <div
+      v-if="tx.loading && tx.transactions.length === 0"
+      class="space-y-5 animate-pulse"
+    >
+      <div class="rounded-2xl bg-emerald-100 h-44" />
+      <div class="rounded-xl bg-slate-100 h-10" />
+      <div class="grid grid-cols-2 gap-4">
+        <div class="rounded-xl bg-slate-100 h-28" />
+        <div class="rounded-xl bg-slate-100 h-28" />
+      </div>
+      <div class="rounded-xl bg-slate-100 h-56" />
+    </div>
+
     <!-- Balance Card (full width) -->
-    <div class="rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-800 p-5 lg:p-6 text-white shadow-lg shadow-emerald-200/60 relative overflow-hidden mb-5">
+    <div
+      v-else
+      class="rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-800 p-5 lg:p-6 text-white shadow-lg shadow-emerald-200/60 relative overflow-hidden mb-5"
+    >
       <div
         class="absolute inset-0 opacity-[0.06]"
         style="background-image: repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%), repeating-linear-gradient(-45deg, white 0, white 1px, transparent 0, transparent 50%); background-size: 20px 20px;"

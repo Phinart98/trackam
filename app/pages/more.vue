@@ -183,8 +183,7 @@ async function confirmClearData() {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       })
-    } catch (err) {
-      console.warn('Failed to delete data from backend:', err)
+    } catch {
       toast.add({ title: 'Could not clear server data', color: 'error' })
       return
     }

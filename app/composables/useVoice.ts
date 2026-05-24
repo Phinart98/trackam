@@ -1,22 +1,8 @@
-/**
- * Voice recording composable — MediaRecorder → Groq Whisper via backend.
- *
- * Works on all modern browsers including Safari 14.1+ (unlike Web Speech API
- * which is Chrome/Edge only). Audio is recorded locally then sent to
- * POST /api/ai/transcribe where Spring AI calls Groq whisper-large-v3-turbo.
- *
- * Usage:
- *   const { supported, isRecording, isTranscribing, start, stop, abort } = useVoice()
- *   await start()           → begins capture, flips isRecording
- *   await stop(apiBaseUrl)  → stops, transcribes, returns transcript string
- *   abort()                 → cancel mid-recording, no API call
- */
-
+// MediaRecorder → POST /api/ai/transcribe → Groq Whisper. Audio needs a live backend.
 export function useVoice() {
   const isRecording = ref(false)
   const isTranscribing = ref(false)
 
-  // No mock fallback — audio requires a live backend to run Groq Whisper
   const config = useRuntimeConfig()
   const supported = import.meta.client
     && typeof MediaRecorder !== 'undefined'
@@ -30,8 +16,7 @@ export function useVoice() {
     chunks = []
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
-    // Prefer opus/webm (Chrome, Firefox) → ogg/opus (Firefox fallback) → mp4 (Safari)
-    // All three are accepted by Groq's Whisper endpoint
+    // opus/webm → ogg/opus → mp4 covers Chrome/Firefox/Safari; Groq accepts all three.
     const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
       .find(m => MediaRecorder.isTypeSupported(m))
 
@@ -52,11 +37,9 @@ export function useVoice() {
 
       mediaRecorder.onstop = async () => {
         const rawMime = mediaRecorder!.mimeType || 'audio/webm'
-        // Some mobile browsers (iOS WebKit, some Android) report video/* for audio-only recordings.
-        // Normalize to audio/* so the backend guardrail accepts it and Groq processes it correctly.
+        // iOS/some Android report video/* for audio-only recordings — coerce so the guardrail accepts it.
         const recordedMime = rawMime.startsWith('video/') ? rawMime.replace('video/', 'audio/') : rawMime
         const blob = new Blob(chunks, { type: recordedMime })
-        // Release the browser's mic indicator immediately
         mediaRecorder!.stream.getTracks().forEach(t => t.stop())
         mediaRecorder = null
 
@@ -79,7 +62,7 @@ export function useVoice() {
 
   async function sendToApi(blob: Blob, mimeType: string, apiBaseUrl: string): Promise<string> {
     const token = await getAuthToken()
-    // File extension must match content so Groq detects the codec correctly
+    // Extension must match content so Groq detects the codec.
     const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm'
 
     const form = new FormData()
@@ -95,7 +78,7 @@ export function useVoice() {
 
   function abort(): void {
     if (mediaRecorder) {
-      mediaRecorder.onstop = null // prevent queued onstop from firing after abort
+      mediaRecorder.onstop = null // prevent queued onstop firing post-abort
       mediaRecorder.stream.getTracks().forEach(t => t.stop())
       mediaRecorder = null
     }

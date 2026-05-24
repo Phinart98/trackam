@@ -21,6 +21,7 @@ export const useAuthStore = defineStore('auth', {
     profile: null as UserProfile | null,
     isLoggedIn: false,
     authError: null as string | null,
+    _initialized: false,
     _listenerAttached: false,
     _unsubscribeAuth: null as (() => void) | null
   }),
@@ -37,7 +38,10 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     /** Initialize Supabase auth listener — call once from app layout. */
     async init() {
-      if (!this.useRealAuth || this._listenerAttached) return
+      if (!this.useRealAuth || this._listenerAttached) {
+        this._initialized = true
+        return
+      }
       this._listenerAttached = true
 
       const supabase = useSupabase()
@@ -52,8 +56,7 @@ export const useAuthStore = defineStore('auth', {
             name: (meta.name as string) || userEmail.split('@')[0] || 'User',
             email: userEmail
           }
-          // Read onboarded from Supabase user_metadata — available immediately, no backend call needed.
-          // This is set by saveOnboardedFlag() when the user completes onboarding.
+          // metaOnboarded is read from user_metadata so routing is correct without a backend hop.
           const metaOnboarded = meta.onboarded === true
           this.profile = {
             ...fallback,
@@ -62,15 +65,10 @@ export const useAuthStore = defineStore('auth', {
             onboarded: metaOnboarded
           }
 
-          // Start transaction fetch NOW, concurrent with the profile fetch below.
-          // On session resume (page reload), this runs at the same time as the 5s profile fetch
-          // so data is ready by the time the app mounts. Loading guard prevents duplicates.
           const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
+          // Fire transactions in parallel with the profile fetch below; loading guard dedupes.
           if (apiBase) useTransactionStore().fetchFromApi(apiBase)
 
-          // Blocking fetch with 5s timeout to load full profile (currency, businessType, etc.)
-          // onboarded routing is already correct from metadata above
-          // (apiBase already declared above)
           if (apiBase) {
             try {
               const token = await getAuthToken()
@@ -86,21 +84,15 @@ export const useAuthStore = defineStore('auth', {
                 ])
                 if (server) {
                   this.profile = mapServerProfile(server, fallback)
-                  // Backfill: if backend says onboarded but metadata doesn't have the flag yet
-                  // (users who onboarded before saveOnboardedFlag() was added), write it now.
-                  // After this runs once, all future sessions use metadata — no backend needed.
+                  // Backfill metadata for users onboarded before saveOnboardedFlag() existed.
                   if (this.profile.onboarded && !metaOnboarded) {
                     this.saveOnboardedFlag().catch(() => {})
                   }
                 }
               }
             } catch {
-              // Backend unreachable or cold-start timeout.
-              // A user in this path has a valid Supabase session but no Pinia profile —
-              // they're a returning user on a new device or cleared localStorage.
-              // New users always have a Pinia profile set by signUp(), so they never reach here.
-              // Only default to true if Supabase metadata confirms they completed onboarding.
-              // New users who hit a cold-start timeout would otherwise skip onboarding entirely.
+              // Cold-start timeout. Only mark onboarded when metadata confirms it —
+              // new users must not skip onboarding when the backend is briefly unreachable.
               if (this.profile && metaOnboarded) this.profile.onboarded = true
             }
           }
@@ -109,6 +101,8 @@ export const useAuthStore = defineStore('auth', {
         this.isLoggedIn = false
         this.profile = null
       }
+
+      this._initialized = true
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session) {
@@ -165,9 +159,7 @@ export const useAuthStore = defineStore('auth', {
 
       const meta = user?.user_metadata ?? {}
       const userEmail = user?.email || email
-      // For returning users, Pinia persist already has the correct profile in
-      // localStorage (including onboarded:true). Use it as the cold-start fallback.
-      // Also check Supabase user_metadata.onboarded — set by saveOnboardedFlag() on completion.
+      // Use persisted localStorage profile + user_metadata.onboarded as cold-start fallback.
       const persisted = this.profile?.email === userEmail ? this.profile : null
       const fallback: UserProfile = {
         name: (meta.name as string) || email.split('@')[0] || 'User',
@@ -178,8 +170,7 @@ export const useAuthStore = defineStore('auth', {
       }
 
       const apiBase = useRuntimeConfig().public.apiBaseUrl as string | undefined
-      // Start transaction fetch NOW, concurrent with the profile fetch below.
-      // The layout watch also calls fetchFromApi after mount, but the loading guard makes it a no-op.
+      // Fire transactions in parallel with the profile fetch below; loading guard dedupes.
       if (apiBase) useTransactionStore().fetchFromApi(apiBase)
       if (apiBase) {
         try {
@@ -194,12 +185,12 @@ export const useAuthStore = defineStore('auth', {
             timeout
           ])
           this.profile = mapServerProfile(server, { name: fallback.name, email: fallback.email })
-          // Backfill metadata for users who onboarded before saveOnboardedFlag() was added
+          // Backfill metadata for users onboarded before saveOnboardedFlag() existed.
           if (this.profile.onboarded && meta.onboarded !== true) {
             this.saveOnboardedFlag().catch(() => {})
           }
         } catch {
-          // Cold start timeout — fall back to fallback (onboarded already correct from metadata + persisted)
+          // Cold-start timeout — onboarded is already correct from metadata + persisted.
           this.profile = fallback
         }
       } else {
@@ -248,10 +239,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    /**
-     * Write onboarded:true into Supabase user_metadata so it survives cleared localStorage.
-     * Called alongside saveProfile() when the user completes onboarding.
-     */
+    /** Persist onboarded:true to user_metadata so it survives cleared localStorage. */
     async saveOnboardedFlag() {
       if (!this.useRealAuth) return
       try {
@@ -304,7 +292,7 @@ export const useAuthStore = defineStore('auth', {
           const supabase = useSupabase()
           await supabase.auth.signOut()
         } catch {
-          // Sign out locally even if network fails
+          // Network failure — still sign out locally.
         }
       }
       this.isLoggedIn = false

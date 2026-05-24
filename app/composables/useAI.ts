@@ -1,4 +1,5 @@
 import type { ParsedTransaction } from '~/types'
+import { CATEGORY_KEYWORDS, INCOME_KEYWORDS, EXPENSE_KEYWORDS } from '~/utils/parseBreakdown'
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -14,26 +15,6 @@ async function apiFetch<T>(baseUrl: string, path: string, body: Record<string, u
   })
 }
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Keyword → category mappings (simulates AI understanding of African informal economy)
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  transport: ['trotro', 'uber', 'bolt', 'bus', 'taxi', 'okada', 'boda', 'matatu', 'danfo', 'fare', 'fuel', 'petrol', 'transport'],
-  food: ['rice', 'tomato', 'pepper', 'onion', 'fish', 'chicken', 'chop', 'waakye', 'food', 'lunch', 'dinner', 'breakfast', 'groceries', 'plantain', 'yam', 'kenkey', 'fufu', 'cook', 'eat'],
-  market: ['market', 'kantamanto', 'makola', 'kejetia', 'oshodi', 'okafor', 'bought', 'wholesale', 'retail', 'goods', 'items', 'shop', 'store'],
-  airtime: ['airtime', 'data', 'mtn', 'vodafone', 'airteltigo', 'glo', 'safaricom', 'bundle', 'top-up', 'topup', 'recharge', 'credit'],
-  bills: ['electricity', 'ecg', 'water', 'gwcl', 'rent', 'bill', 'utility', 'internet', 'wifi', 'gas', 'light'],
-  health: ['hospital', 'clinic', 'pharmacy', 'medicine', 'drug', 'doctor', 'nhis', 'paracetamol', 'health'],
-  education: ['school', 'fees', 'book', 'stationery', 'tuition', 'class', 'lesson', 'education'],
-  supplies: ['supplies', 'stock', 'raw', 'material', 'needle', 'thread', 'wholesale'],
-  personal: ['barber', 'salon', 'hair', 'cloth', 'clothing', 'shoe', 'personal'],
-  gifts: ['church', 'tithe', 'offering', 'gift', 'donation', 'wedding', 'funeral', 'family'],
-  sales: ['sold', 'sale', 'customer', 'paid me', 'received payment', 'profit', 'fabric', 'kente', 'batik', 'shirt'],
-  momo: ['momo', 'mobile money', 'received', 'transfer', 'sent'],
-  salary: ['salary', 'wage', 'pay', 'paycheck', 'allowance']
-}
-
-const INCOME_KEYWORDS = ['sold', 'received', 'earned', 'income', 'payment', 'sale', 'profit', 'wages', 'salary', 'collected', 'momo received', 'transfer in']
-const EXPENSE_KEYWORDS = ['bought', 'paid', 'spent', 'purchase', 'buy', 'cost', 'fee', 'bill', 'expense', 'trotro', 'taxi']
 
 function detectCategory(text: string): string {
   const lower = text.toLowerCase()
