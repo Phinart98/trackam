@@ -30,6 +30,21 @@ export const useTransactionStore = defineStore('transactions', {
     totalExpenses: state => sumByType(state.transactions, 'expense'),
     balance(): number { return this.totalIncome - this.totalExpenses },
 
+    /**
+     * Tripwire: true when stored transactions span more than one currency.
+     * The currency-switch flow always converts in one shot, so this should
+     * stay false. If it ever flips true, the balance below is summing across
+     * currencies and is meaningless — show a banner so the user can recover.
+     */
+    hasMixedCurrency: (state): boolean => {
+      const currencies = new Set<string>()
+      for (const t of state.transactions) {
+        if (t.currency) currencies.add(t.currency.toUpperCase())
+        if (currencies.size > 1) return true
+      }
+      return false
+    },
+
     recentTransactions(): Transaction[] {
       return this.sorted.slice(0, 5)
     },

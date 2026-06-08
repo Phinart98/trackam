@@ -1,16 +1,22 @@
 # TrackAm — Architecture
 
-**AI-Powered Financial Intelligence for Africa's Informal Economy** · BeOrchid Africa Developers Hackathon 2026 (FinTech)
+**AI-Powered Financial Intelligence for Africans the Credit System Forgot** · BeOrchid Africa Developers Hackathon 2026 (FinTech)
 
 ---
 
 ## The problem
 
-**85.8% of African employment is informal**¹. Market traders, trotro drivers, food vendors, freelancers — they power the continent's economy, yet their transactions produce no financial record. Africa processed **$1.1 trillion in mobile money in 2024**², most of it untracked. Without records, workers can't track profitability, identify wasteful spending, access credit, or make data-driven decisions.
+**85.8% of African employment is informal**¹. Market traders, trotro drivers, food vendors, freelancers. They power the continent's economy, yet their transactions produce no financial record. Africa processed **$1.1 trillion in mobile money in 2024**², most of it untracked. Without records, workers can't track profitability, identify wasteful spending, access credit, or make data-driven decisions.
 
-Existing tools (QuickBooks, Expensify, Zoho) were built for **Western formal businesses** — corporate cards, printed receipts, accounting literacy. They are unusable for a market trader in Kantamanto or a trotro driver in Accra. A Kampala study³ found **68.6% of SMEs cite lack of accounting knowledge** as the primary barrier to record-keeping.
+The gap isn't only informal, though. Even formally employed Africans (salaried professionals with side hustles, small business owners managing a salary plus a fabric shop, freelance designers with clients in three currencies) don't use QuickBooks or Expensify. Those tools were built for a financial culture that doesn't include MoMo, mixed currencies as a daily reality, family obligations as a recurring expense, or cash as the primary rail. A Kampala study³ found **68.6% of SMEs cite lack of accounting knowledge** as the primary barrier to record-keeping. The same friction stops salaried Africans the same way.
 
-TrackAm meets users where they are: cash, MoMo, handwritten receipts, natural language — no accounting knowledge required.
+### The credit-scoring gap this opens
+
+The downstream consequence is the deepest one. African credit infrastructure is broken because **most of the continent has no formal financial history**. Informal earners by definition, but also salaried earners whose MoMo flows, side hustles, and cash income never reach a bank ledger. Banks ask for records that don't exist. Users can't get loans, can't grow businesses, can't smooth income shocks.
+
+TrackAm's design choice is deliberate. Every transaction is stored with full provenance: timestamp, source (manual, text, voice, image), confidence, original currency, AI audit log. Over months of use, a user passively accumulates the **structured, audit-trailed financial history** that credit scoring has always needed in this region. Today TrackAm is a tracker. The next layer is fair, locally-grounded credit scoring built on top.
+
+TrackAm meets every African where they are. Cash, MoMo, handwritten receipts, natural language. No accounting knowledge required.
 
 ## What it does
 
@@ -22,7 +28,7 @@ TrackAm meets users where they are: cash, MoMo, handwritten receipts, natural la
 | **Voice** | speak the transaction | transcribed → then parsed as text |
 | **Advisor chat** | `"Where do I spend the most?"` | tool-use query on YOUR real transaction SQL → grounded answer |
 
-The "AI moment" surfaces every parse visibly: a violet badge (`AI parsed · 0.4s`) and a `How I parsed this` panel showing which tokens in the original input drove each parsed field. This builds trust — judges and users can see the AI isn't a black box.
+The "AI moment" surfaces every parse visibly: a violet badge (`AI parsed · 0.4s`) and a `How I parsed this` panel showing which tokens in the original input drove each parsed field. This builds trust. Judges and users can see the AI isn't a black box.
 
 ## System diagram
 
@@ -102,7 +108,7 @@ Most AI demos call an API and display the result. TrackAm builds a full reliabil
 - Supabase issues a JWT (ES256, JWKS-published) on email+password sign-in.
 - Frontend stores the session; attaches `Authorization: Bearer <jwt>` to every backend call.
 - Backend validates via `NimbusJwtDecoder.withJwkSetUri(...)` + `JwtIssuerValidator` + `JwtClaimValidator` (audience `authenticated`). No shared secret.
-- Every controller extracts `userId` from the validated JWT subject — passed to services, used to scope every query. **No cross-user data leak path possible.**
+- Every controller extracts `userId` from the validated JWT subject, then passes it to services and uses it to scope every query. **No cross-user data leak path possible.**
 - Passwords stored as bcrypt `$2a$10$` (verified).
 
 ## Data flow — the "AI moment" parse

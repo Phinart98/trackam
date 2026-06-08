@@ -92,41 +92,49 @@ async function changeCurrency(newCode: string) {
       `Convert existing amounts from ${oldCode} to ${newCode}?`,
       { message: 'This will update all transaction amounts using today\'s exchange rate.', confirmLabel: 'Convert' }
     )
-    if (doConvert) {
-      try {
-        // Convert data first, then save currency — this way a failed conversion
-        // doesn't leave the backend profile showing a currency the data isn't in
-        const token = await getAuthToken()
-        await $fetch(`${apiBase}/api/transactions/convert-currency?from=${oldCode}&to=${newCode}`, {
-          method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        })
-        // Convert monthly budget at today's rate (transactions use historical rates)
-        if (auth.profile?.monthlyBudget) {
-          try {
-            const fx = await $fetch<{ rate: number }>(`${apiBase}/api/fx/rate?from=${oldCode}&to=${newCode}`, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {}
-            })
-            auth.profile.monthlyBudget = Math.round(auth.profile.monthlyBudget * Number(fx.rate))
-          } catch {
-            // Rate unavailable — leave budget unchanged, user can update manually
-          }
-        }
-        selectedCurrency.value = newCode
-        const saved = await auth.saveProfile()
-        if (!saved) toast.add(SAVE_FAILURE_TOAST)
-        await Promise.all([tx.fetchFromApi(apiBase), goalStore.loadGoals()])
-        tx.aiInsightAt = 0 // force dashboard insight to reflect new currency
-        toast.add({ title: `Amounts converted to ${newCode}`, color: 'success' })
-      } catch {
-        // Conversion failed — data unchanged, no need to revert or re-save
-        toast.add({ title: 'Conversion failed', description: 'Amounts were not converted. Try again.', color: 'error' })
-      }
+    if (!doConvert) {
+      // Refusing the conversion would leave old amounts labelled as the new currency,
+      // mixing values across currencies and producing wrong totals on the dashboard.
+      toast.add({
+        title: 'Currency change cancelled',
+        description: `Converting from ${oldCode} to ${newCode} is required when you already have transactions.`,
+        color: 'warning'
+      })
       return
     }
+    try {
+      // Convert data first, then save currency — this way a failed conversion
+      // doesn't leave the backend profile showing a currency the data isn't in
+      const token = await getAuthToken()
+      await $fetch(`${apiBase}/api/transactions/convert-currency?from=${oldCode}&to=${newCode}`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
+      // Convert monthly budget at today's rate (transactions use historical rates)
+      if (auth.profile?.monthlyBudget) {
+        try {
+          const fx = await $fetch<{ rate: number }>(`${apiBase}/api/fx/rate?from=${oldCode}&to=${newCode}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          })
+          auth.profile.monthlyBudget = Math.round(auth.profile.monthlyBudget * Number(fx.rate))
+        } catch {
+          // Rate unavailable — leave budget unchanged, user can update manually
+        }
+      }
+      selectedCurrency.value = newCode
+      const saved = await auth.saveProfile()
+      if (!saved) toast.add(SAVE_FAILURE_TOAST)
+      await Promise.all([tx.fetchFromApi(apiBase), goalStore.loadGoals()])
+      tx.aiInsightAt = 0 // force dashboard insight to reflect new currency
+      toast.add({ title: `Amounts converted to ${newCode}`, color: 'success' })
+    } catch {
+      // Conversion failed — data unchanged, no need to revert or re-save
+      toast.add({ title: 'Conversion failed', description: 'Amounts were not converted. Try again.', color: 'error' })
+    }
+    return
   }
 
-  // No conversion needed (or user declined) — just update currency
+  // No transactions to convert — safe to just update currency
   selectedCurrency.value = newCode
   const saved = await auth.saveProfile()
   if (!saved) toast.add(SAVE_FAILURE_TOAST)

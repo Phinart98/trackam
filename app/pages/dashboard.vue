@@ -205,9 +205,30 @@ const hasWeeklyData = computed(() =>
       <div class="rounded-xl bg-slate-100 h-56" />
     </div>
 
+    <!-- Mixed-currency tripwire: should normally stay hidden. If it appears, the user's
+         transactions span more than one currency and the totals below are nonsensical. -->
+    <NuxtLink
+      v-if="!tx.loading && tx.hasMixedCurrency"
+      to="/more"
+      class="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 mb-4 hover:bg-amber-100 transition-colors"
+    >
+      <UIcon
+        name="i-lucide-triangle-alert"
+        class="text-amber-600 text-lg shrink-0 mt-0.5"
+      />
+      <div class="flex-1 text-sm">
+        <p class="font-semibold text-amber-900">
+          Some transactions are in a different currency
+        </p>
+        <p class="text-amber-700 text-xs mt-0.5">
+          Totals below may be inaccurate. Go to Settings → Currency to convert everything to one.
+        </p>
+      </div>
+    </NuxtLink>
+
     <!-- Balance Card (full width) -->
     <div
-      v-else
+      v-if="!(tx.loading && tx.transactions.length === 0)"
       class="rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-800 p-5 lg:p-6 text-white shadow-lg shadow-emerald-200/60 relative overflow-hidden mb-5"
     >
       <div
