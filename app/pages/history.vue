@@ -216,7 +216,10 @@ onUnmounted(() => observer?.disconnect())
         to="/add"
         class="inline-flex items-center gap-1.5 mt-4 px-5 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-95 transition-all"
       >
-        <UIcon name="i-lucide-plus" class="text-base" />
+        <UIcon
+          name="i-lucide-plus"
+          class="text-base"
+        />
         Add your first entry
       </NuxtLink>
     </div>

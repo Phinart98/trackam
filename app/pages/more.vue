@@ -432,7 +432,10 @@ function logout() {
                 v-if="budgetSaved"
                 class="flex items-center gap-1 text-[11px] font-semibold text-emerald-600"
               >
-                <UIcon name="i-lucide-check" class="text-xs" />
+                <UIcon
+                  name="i-lucide-check"
+                  class="text-xs"
+                />
                 Saved
               </span>
             </Transition>

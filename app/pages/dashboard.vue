@@ -29,11 +29,13 @@ async function refreshInsightIfStale(force = false) {
   try {
     const top = tx.categoryBreakdown[0]
     const anomaly = detectAnomalies(tx.transactions, auth.currency)[0]?.message ?? null
+    // Round to 2dp so the LLM never echoes spurious precision from raw float math.
+    const round2 = (n: number) => Math.round(n * 100) / 100
     const text = await generateInsight({
       currency: auth.currency,
-      totalIncome: tx.totalIncome,
-      totalExpenses: tx.totalExpenses,
-      balance: tx.balance,
+      totalIncome: round2(tx.totalIncome),
+      totalExpenses: round2(tx.totalExpenses),
+      balance: round2(tx.balance),
       burnPercent: tx.forecast.burnPercent,
       daysRemaining: tx.forecast.daysRemaining,
       topCategoryName: top?.name ?? 'General',
@@ -46,7 +48,12 @@ async function refreshInsightIfStale(force = false) {
     tx.aiInsightAt = Date.now()
     tx.aiInsightTxCount = tx.transactions.length
   } catch {
-    if (force) toast.add({ title: 'Could not refresh insight', description: 'AI providers are busy — try again in a moment.', color: 'warning' })
+    if (force) toast.add({
+      title: 'Could not refresh insight',
+      description: 'AI providers are busy. Give it a moment and try again.',
+      color: 'warning',
+      duration: 9000
+    })
     // keep showing last cached insight or fallback
   } finally {
     insightLoading.value = false

@@ -88,6 +88,7 @@ const parsedDateEdit = ref('')
 const displayedConfidence = ref(0)
 const textParseElapsedMs = ref<number | null>(null)
 const showTextReasoning = ref(false)
+const textParseError = ref('')
 const textAmountInput = ref<HTMLInputElement | null>(null)
 let textConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
@@ -129,6 +130,7 @@ async function handleParseText() {
   if (!textInput.value.trim()) return
   isParsing.value = true
   parsedResult.value = null
+  textParseError.value = ''
   showTextReasoning.value = false
   const started = performance.now()
   const inputAtStart = textInput.value
@@ -141,10 +143,13 @@ async function handleParseText() {
     if (textConfidenceTimer) clearInterval(textConfidenceTimer)
     textConfidenceTimer = startConfidenceAnimation(result.confidence, displayedConfidence)
   } catch {
+    // Show inline AND as a toast — inline persists if the toast queue misses it.
+    textParseError.value = 'AI couldn\'t read that. Try adding more detail (e.g. "bought rice 50 cedis at Makola"), or switch to the Manual tab.'
     toast.add({
       title: 'AI couldn\'t read that',
       description: 'Try adding more detail (e.g. "bought rice 50 cedis at Makola"), or switch to the Manual tab.',
-      color: 'warning'
+      color: 'warning',
+      duration: 9000
     })
   } finally {
     isParsing.value = false
@@ -161,6 +166,7 @@ const scanResult = ref<ParsedTransaction | null>(null)
 const scanDateEdit = ref('')
 const scanConfidence = ref(0)
 const scanParseElapsedMs = ref<number | null>(null)
+const scanError = ref('')
 let scanConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
 const scanNeedsAmount = computed(() => !hasAmount(scanResult.value))
@@ -189,6 +195,7 @@ onUnmounted(() => {
 async function handleScan(file: File) {
   isScanning.value = true
   scanResult.value = null
+  scanError.value = ''
   const started = performance.now()
   try {
     const result = await parseImage(file)
@@ -198,10 +205,12 @@ async function handleScan(file: File) {
     if (scanConfidenceTimer) clearInterval(scanConfidenceTimer)
     scanConfidenceTimer = startConfidenceAnimation(result.confidence, scanConfidence)
   } catch {
+    scanError.value = 'AI Vision couldn\'t read this image. Try a clearer photo (good lighting, full receipt in frame), or use the Manual tab.'
     toast.add({
       title: 'AI Vision couldn\'t read this image',
       description: 'Try a clearer photo (good lighting, full receipt in frame), or use the Manual tab.',
-      color: 'warning'
+      color: 'warning',
+      duration: 9000
     })
   } finally {
     isScanning.value = false
@@ -384,10 +393,22 @@ const confidenceColor = (score: number) =>
                 class="waveform"
                 aria-hidden="true"
               >
-                <span class="bar" style="--delay:0s" />
-                <span class="bar" style="--delay:0.15s" />
-                <span class="bar" style="--delay:0.3s" />
-                <span class="bar" style="--delay:0.45s" />
+                <span
+                  class="bar"
+                  style="--delay:0s"
+                />
+                <span
+                  class="bar"
+                  style="--delay:0.15s"
+                />
+                <span
+                  class="bar"
+                  style="--delay:0.3s"
+                />
+                <span
+                  class="bar"
+                  style="--delay:0.45s"
+                />
               </span>
               <!-- Spinner while Whisper processes -->
               <UIcon
@@ -439,6 +460,20 @@ const confidenceColor = (score: number) =>
           {{ isParsing ? 'Parsing with AI…' : 'Parse with AI' }}
         </button>
 
+        <!-- Inline error — persists until user retries (toast can race-miss; this can't) -->
+        <div
+          v-if="textParseError && !parsedResult"
+          class="rounded-xl border border-amber-200 bg-amber-50 p-3 flex items-start gap-2"
+        >
+          <UIcon
+            name="i-lucide-triangle-alert"
+            class="text-amber-600 text-base mt-0.5 flex-shrink-0"
+          />
+          <p class="text-[13px] text-amber-900">
+            {{ textParseError }}
+          </p>
+        </div>
+
         <!-- Preview Card -->
         <div
           v-if="parsedResult"
@@ -447,9 +482,15 @@ const confidenceColor = (score: number) =>
           <!-- AI moment: badge + parse latency -->
           <div class="flex items-center justify-between -mt-1">
             <span class="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-violet-100">
-              <UIcon name="i-lucide-sparkles" class="text-xs" />
+              <UIcon
+                name="i-lucide-sparkles"
+                class="text-xs"
+              />
               AI parsed
-              <span v-if="textParseElapsedMs !== null" class="text-violet-400">· {{ (textParseElapsedMs / 1000).toFixed(1) }}s</span>
+              <span
+                v-if="textParseElapsedMs !== null"
+                class="text-violet-400"
+              >· {{ (textParseElapsedMs / 1000).toFixed(1) }}s</span>
             </span>
             <button
               v-if="textBreakdown.length > 0"
@@ -459,7 +500,10 @@ const confidenceColor = (score: number) =>
               aria-controls="text-reasoning-panel"
               @click="showTextReasoning = !showTextReasoning"
             >
-              <UIcon :name="showTextReasoning ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="text-xs" />
+              <UIcon
+                :name="showTextReasoning ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                class="text-xs"
+              />
               How I parsed this
             </button>
           </div>
@@ -512,7 +556,10 @@ const confidenceColor = (score: number) =>
             v-if="parsedNeedsAmount"
             class="flex items-start gap-1.5 text-xs text-amber-700 -mt-1"
           >
-            <UIcon name="i-lucide-info" class="text-amber-500 text-sm shrink-0 mt-px" />
+            <UIcon
+              name="i-lucide-info"
+              class="text-amber-500 text-sm shrink-0 mt-px"
+            />
             <span>We couldn't catch an amount. Type it in above and you're good to go.</span>
           </p>
 
@@ -544,8 +591,15 @@ const confidenceColor = (score: number) =>
                 : 'border-slate-200 bg-white hover:border-slate-300'"
               @click="parsedResult.category = cat.id"
             >
-              <span class="flex items-center justify-center w-6 h-6 rounded-md" :class="cat.bgColor">
-                <UIcon :name="cat.icon" class="text-xs" :class="cat.color" />
+              <span
+                class="flex items-center justify-center w-6 h-6 rounded-md"
+                :class="cat.bgColor"
+              >
+                <UIcon
+                  :name="cat.icon"
+                  class="text-xs"
+                  :class="cat.color"
+                />
               </span>
               <span class="text-[10px] font-medium text-slate-600 leading-tight">{{ cat.name }}</span>
             </button>
@@ -612,7 +666,10 @@ const confidenceColor = (score: number) =>
             </p>
 
             <p class="text-sm leading-relaxed text-slate-700 break-words">
-              <template v-for="(part, i) in highlightedTextInput" :key="i">
+              <template
+                v-for="(part, i) in highlightedTextInput"
+                :key="i"
+              >
                 <span
                   v-if="part.field"
                   class="inline-flex items-center rounded px-1 py-0.5 text-[13px] font-semibold ring-1"
@@ -628,11 +685,17 @@ const confidenceColor = (score: number) =>
                 :key="tok.field + tok.token"
                 class="flex items-start gap-2 text-xs text-slate-600"
               >
-                <span class="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full" :class="fieldStyles[tok.field]?.dot" />
+                <span
+                  class="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                  :class="fieldStyles[tok.field]?.dot"
+                />
                 <span>
                   <span class="font-mono font-medium text-slate-800">"{{ tok.token }}"</span>
                   <span class="text-slate-400"> → </span>
-                  <span class="font-semibold" :class="fieldStyles[tok.field]?.text">{{ fieldStyles[tok.field]?.label }}</span>
+                  <span
+                    class="font-semibold"
+                    :class="fieldStyles[tok.field]?.text"
+                  >{{ fieldStyles[tok.field]?.label }}</span>
                   <span class="text-slate-500"> ({{ tok.value }})</span>
                 </span>
               </li>
@@ -706,6 +769,20 @@ const confidenceColor = (score: number) =>
           <span class="text-sm text-slate-500">Reading with AI vision…</span>
         </div>
 
+        <!-- Inline error — persists if toast races past the user -->
+        <div
+          v-if="scanError && !scanResult"
+          class="rounded-xl border border-amber-200 bg-amber-50 p-3 flex items-start gap-2"
+        >
+          <UIcon
+            name="i-lucide-triangle-alert"
+            class="text-amber-600 text-base mt-0.5 flex-shrink-0"
+          />
+          <p class="text-[13px] text-amber-900">
+            {{ scanError }}
+          </p>
+        </div>
+
         <!-- Scan Result -->
         <div
           v-if="scanResult"
@@ -714,9 +791,15 @@ const confidenceColor = (score: number) =>
           <!-- AI moment: vision badge + parse latency -->
           <div class="flex items-center -mt-1">
             <span class="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-violet-100">
-              <UIcon name="i-lucide-scan-eye" class="text-xs" />
+              <UIcon
+                name="i-lucide-scan-eye"
+                class="text-xs"
+              />
               AI Vision extracted
-              <span v-if="scanParseElapsedMs !== null" class="text-violet-400">· {{ (scanParseElapsedMs / 1000).toFixed(1) }}s</span>
+              <span
+                v-if="scanParseElapsedMs !== null"
+                class="text-violet-400"
+              >· {{ (scanParseElapsedMs / 1000).toFixed(1) }}s</span>
             </span>
           </div>
 
@@ -766,7 +849,10 @@ const confidenceColor = (score: number) =>
             v-if="scanNeedsAmount"
             class="flex items-start gap-1.5 text-xs text-amber-700 -mt-1"
           >
-            <UIcon name="i-lucide-info" class="text-amber-500 text-sm shrink-0 mt-px" />
+            <UIcon
+              name="i-lucide-info"
+              class="text-amber-500 text-sm shrink-0 mt-px"
+            />
             <span>We couldn't read the total from this image. Type it in above and you're good to go.</span>
           </p>
 
@@ -798,8 +884,15 @@ const confidenceColor = (score: number) =>
                 : 'border-slate-200 bg-white hover:border-slate-300'"
               @click="scanResult.category = cat.id"
             >
-              <span class="flex items-center justify-center w-6 h-6 rounded-md" :class="cat.bgColor">
-                <UIcon :name="cat.icon" class="text-xs" :class="cat.color" />
+              <span
+                class="flex items-center justify-center w-6 h-6 rounded-md"
+                :class="cat.bgColor"
+              >
+                <UIcon
+                  :name="cat.icon"
+                  class="text-xs"
+                  :class="cat.color"
+                />
               </span>
               <span class="text-[10px] font-medium text-slate-600 leading-tight">{{ cat.name }}</span>
             </button>
@@ -910,7 +1003,10 @@ const confidenceColor = (score: number) =>
                 @click="showManualCurrencyPicker = !showManualCurrencyPicker"
               >
                 {{ getCurrencySymbol(manualCurrency) }}
-                <UIcon name="i-lucide-chevron-down" class="text-xs text-slate-400" />
+                <UIcon
+                  name="i-lucide-chevron-down"
+                  class="text-xs text-slate-400"
+                />
               </button>
               <!-- Dropdown -->
               <div
@@ -944,7 +1040,10 @@ const confidenceColor = (score: number) =>
             v-if="manualCurrency !== auth.currency"
             class="text-xs text-blue-600 mt-1.5 flex items-center gap-1"
           >
-            <UIcon name="i-lucide-arrow-right-left" class="text-xs" />
+            <UIcon
+              name="i-lucide-arrow-right-left"
+              class="text-xs"
+            />
             Will be converted to {{ getCurrencySymbol(auth.currency) }} at the date's rate
           </p>
         </div>
