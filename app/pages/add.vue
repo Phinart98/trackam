@@ -70,7 +70,17 @@ const parsedDateEdit = ref('')
 const displayedConfidence = ref(0)
 const textParseElapsedMs = ref<number | null>(null)
 const showTextReasoning = ref(false)
+const textAmountInput = ref<HTMLInputElement | null>(null)
 let textConfidenceTimer: ReturnType<typeof setInterval> | null = null
+
+// Focus the inline amount field whenever a parse comes back without one — the user
+// can finish what the AI started without hunting for the cursor.
+watch(parsedResult, async (result) => {
+  if (result && !(result.amount > 0)) {
+    await nextTick()
+    textAmountInput.value?.focus()
+  }
+})
 
 const textBreakdown = computed<BreakdownToken[]>(() => {
   if (!parsedResult.value || !lastTextInput.value) return []
@@ -115,7 +125,11 @@ async function handleParseText() {
     if (textConfidenceTimer) clearInterval(textConfidenceTimer)
     textConfidenceTimer = startConfidenceAnimation(result.confidence, displayedConfidence)
   } catch {
-    toast.add({ title: 'Parse failed', description: 'Could not read transaction. Try again.', color: 'error' })
+    toast.add({
+      title: 'AI couldn\'t read that',
+      description: 'Try adding more detail (e.g. "bought rice 50 cedis at Makola"), or switch to the Manual tab.',
+      color: 'warning'
+    })
   } finally {
     isParsing.value = false
   }
@@ -126,11 +140,19 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
 const previewUrl = ref<string | null>(null)
 const isScanning = ref(false)
+const scanAmountInput = ref<HTMLInputElement | null>(null)
 const scanResult = ref<ParsedTransaction | null>(null)
 const scanDateEdit = ref('')
 const scanConfidence = ref(0)
 const scanParseElapsedMs = ref<number | null>(null)
 let scanConfidenceTimer: ReturnType<typeof setInterval> | null = null
+
+watch(scanResult, async (result) => {
+  if (result && !(result.amount > 0)) {
+    await nextTick()
+    scanAmountInput.value?.focus()
+  }
+})
 
 function handleFileSelect(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
@@ -160,7 +182,11 @@ async function handleScan(file: File) {
     if (scanConfidenceTimer) clearInterval(scanConfidenceTimer)
     scanConfidenceTimer = startConfidenceAnimation(result.confidence, scanConfidence)
   } catch {
-    toast.add({ title: 'Scan failed', description: 'Could not read the image. Try again or enter manually.', color: 'error' })
+    toast.add({
+      title: 'AI Vision couldn\'t read this image',
+      description: 'Try a clearer photo (good lighting, full receipt in frame), or use the Manual tab.',
+      color: 'warning'
+    })
   } finally {
     isScanning.value = false
   }
@@ -422,8 +448,8 @@ const confidenceColor = (score: number) =>
             </button>
           </div>
 
-          <div class="flex items-start justify-between">
-            <div>
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
               <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
                 Parsed Result
               </p>
@@ -437,13 +463,42 @@ const confidenceColor = (score: number) =>
                 {{ parsedResult.vendor }}
               </p>
             </div>
+            <!-- Amount: show parsed value if we have one, otherwise prompt for it inline. -->
             <span
-              class="text-lg font-bold"
+              v-if="parsedResult.amount > 0"
+              class="text-lg font-bold shrink-0"
               :class="parsedResult.type === 'income' ? 'text-emerald-600' : 'text-slate-800'"
             >
               {{ parsedResult.type === 'income' ? '+' : '-' }}{{ formatCurrency(parsedResult.amount, auth.currency) }}
             </span>
+            <div
+              v-else
+              class="flex items-center gap-1.5 shrink-0"
+            >
+              <span class="text-sm font-semibold text-slate-500">{{ getCurrencySymbol(auth.currency) }}</span>
+              <input
+                ref="textAmountInput"
+                v-model.number="parsedResult.amount"
+                type="number"
+                inputmode="decimal"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                aria-label="Amount"
+                class="w-24 rounded-lg border-2 border-amber-300 bg-amber-50 px-2 py-1.5 text-right text-base font-bold text-slate-800 focus:outline-none focus:border-amber-500"
+              >
+            </div>
           </div>
+
+          <!-- Inline prompt when the AI didn't catch the amount. No dead-end toast; the parse card
+               is still usable — user just types the missing number above and saves. -->
+          <p
+            v-if="!(parsedResult.amount > 0)"
+            class="flex items-start gap-1.5 text-xs text-amber-700 -mt-1"
+          >
+            <UIcon name="i-lucide-info" class="text-amber-500 text-sm shrink-0 mt-px" />
+            <span>We couldn't catch an amount. Type it in above and you're good to go.</span>
+          </p>
 
           <!-- Editable type toggle -->
           <div class="flex gap-1.5 p-0.5 bg-slate-100 rounded-lg w-fit">
@@ -576,7 +631,7 @@ const confidenceColor = (score: number) =>
               Cancel
             </button>
             <button
-              :disabled="isSavingParsed"
+              :disabled="isSavingParsed || !(parsedResult.amount > 0) || !parsedResult.description"
               class="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               @click="saveTransaction(parsedResult!, textFromVoice ? 'ai-voice' : 'ai-text', parsedDateEdit)"
             >
@@ -649,8 +704,8 @@ const confidenceColor = (score: number) =>
             </span>
           </div>
 
-          <div class="flex items-start justify-between">
-            <div>
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
               <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
                 Extracted
               </p>
@@ -665,12 +720,39 @@ const confidenceColor = (score: number) =>
               </p>
             </div>
             <span
-              class="text-lg font-bold"
+              v-if="scanResult.amount > 0"
+              class="text-lg font-bold shrink-0"
               :class="scanResult.type === 'income' ? 'text-emerald-600' : 'text-slate-800'"
             >
               {{ scanResult.type === 'income' ? '+' : '-' }}{{ formatCurrency(scanResult.amount, auth.currency) }}
             </span>
+            <div
+              v-else
+              class="flex items-center gap-1.5 shrink-0"
+            >
+              <span class="text-sm font-semibold text-slate-500">{{ getCurrencySymbol(auth.currency) }}</span>
+              <input
+                ref="scanAmountInput"
+                v-model.number="scanResult.amount"
+                type="number"
+                inputmode="decimal"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                aria-label="Amount"
+                class="w-24 rounded-lg border-2 border-amber-300 bg-amber-50 px-2 py-1.5 text-right text-base font-bold text-slate-800 focus:outline-none focus:border-amber-500"
+              >
+            </div>
           </div>
+
+          <!-- Inline prompt when vision couldn't read the receipt total. -->
+          <p
+            v-if="!(scanResult.amount > 0)"
+            class="flex items-start gap-1.5 text-xs text-amber-700 -mt-1"
+          >
+            <UIcon name="i-lucide-info" class="text-amber-500 text-sm shrink-0 mt-px" />
+            <span>We couldn't read the total from this image. Type it in above and you're good to go.</span>
+          </p>
 
           <!-- Editable type toggle -->
           <div class="flex gap-1.5 p-0.5 bg-slate-100 rounded-lg w-fit">
@@ -764,7 +846,7 @@ const confidenceColor = (score: number) =>
               Cancel
             </button>
             <button
-              :disabled="isSavingParsed"
+              :disabled="isSavingParsed || !(scanResult.amount > 0) || !scanResult.description"
               class="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               @click="saveTransaction(scanResult!, 'ai-image', scanDateEdit)"
             >
