@@ -103,23 +103,20 @@ async function changeCurrency(newCode: string) {
       return
     }
     try {
-      // Convert data first, then save currency — this way a failed conversion
-      // doesn't leave the backend profile showing a currency the data isn't in
+      // Fire the conversion and the budget FX-rate lookup in parallel — they're independent
+      // (the budget multiplier doesn't depend on the convert-currency result and vice versa),
+      // and the user is staring at a spinner so we want to halve the wall-clock latency.
       const token = await getAuthToken()
-      await $fetch(`${apiBase}/api/transactions/convert-currency?from=${oldCode}&to=${newCode}`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      })
-      // Convert monthly budget at today's rate (transactions use historical rates)
-      if (auth.profile?.monthlyBudget) {
-        try {
-          const fx = await $fetch<{ rate: number }>(`${apiBase}/api/fx/rate?from=${oldCode}&to=${newCode}`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {}
-          })
-          auth.profile.monthlyBudget = Math.round(auth.profile.monthlyBudget * Number(fx.rate))
-        } catch {
-          // Rate unavailable — leave budget unchanged, user can update manually
-        }
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+      const budgetRatePromise = auth.profile?.monthlyBudget
+        ? $fetch<{ rate: number }>(`${apiBase}/api/fx/rate?from=${oldCode}&to=${newCode}`, { headers }).catch(() => null)
+        : Promise.resolve(null)
+      const [, budgetFx] = await Promise.all([
+        $fetch(`${apiBase}/api/transactions/convert-currency?from=${oldCode}&to=${newCode}`, { method: 'POST', headers }),
+        budgetRatePromise
+      ])
+      if (budgetFx && auth.profile?.monthlyBudget) {
+        auth.profile.monthlyBudget = Math.round(auth.profile.monthlyBudget * Number(budgetFx.rate))
       }
       selectedCurrency.value = newCode
       const saved = await auth.saveProfile()
@@ -134,7 +131,7 @@ async function changeCurrency(newCode: string) {
     return
   }
 
-  // No transactions to convert — safe to just update currency
+  // No existing transactions — safe to update currency directly.
   selectedCurrency.value = newCode
   const saved = await auth.saveProfile()
   if (!saved) toast.add(SAVE_FAILURE_TOAST)

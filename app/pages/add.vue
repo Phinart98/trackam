@@ -61,6 +61,24 @@ async function toggleVoice() {
   }
 }
 
+// Shared styling + helper for the partial-parse amount fallback. Both AI tabs
+// reuse this so the warning input stays visually identical across them.
+const AMOUNT_INPUT_CLASS = 'w-24 rounded-lg border-2 border-amber-300 bg-amber-50 px-2 py-1.5 text-right text-base font-bold text-slate-800 focus:outline-none focus:border-amber-500'
+
+function focusOnMissingAmount(
+  source: Ref<ParsedTransaction | null>,
+  target: Ref<HTMLInputElement | null>
+) {
+  watch(source, async (r) => {
+    if (r && !(r.amount > 0)) {
+      await nextTick()
+      target.value?.focus()
+    }
+  })
+}
+
+const hasAmount = (r: ParsedTransaction | null) => !!r && r.amount > 0
+
 // --- Text tab ---
 const textInput = ref('')
 const lastTextInput = ref('')
@@ -73,14 +91,12 @@ const showTextReasoning = ref(false)
 const textAmountInput = ref<HTMLInputElement | null>(null)
 let textConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
-// Focus the inline amount field whenever a parse comes back without one — the user
-// can finish what the AI started without hunting for the cursor.
-watch(parsedResult, async (result) => {
-  if (result && !(result.amount > 0)) {
-    await nextTick()
-    textAmountInput.value?.focus()
-  }
-})
+const parsedNeedsAmount = computed(() => !hasAmount(parsedResult.value))
+const canSaveParsed = computed(() =>
+  !!parsedResult.value && hasAmount(parsedResult.value) && !!parsedResult.value.description
+)
+
+focusOnMissingAmount(parsedResult, textAmountInput)
 
 const textBreakdown = computed<BreakdownToken[]>(() => {
   if (!parsedResult.value || !lastTextInput.value) return []
@@ -147,12 +163,12 @@ const scanConfidence = ref(0)
 const scanParseElapsedMs = ref<number | null>(null)
 let scanConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
-watch(scanResult, async (result) => {
-  if (result && !(result.amount > 0)) {
-    await nextTick()
-    scanAmountInput.value?.focus()
-  }
-})
+const scanNeedsAmount = computed(() => !hasAmount(scanResult.value))
+const canSaveScan = computed(() =>
+  !!scanResult.value && hasAmount(scanResult.value) && !!scanResult.value.description
+)
+
+focusOnMissingAmount(scanResult, scanAmountInput)
 
 function handleFileSelect(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
@@ -465,7 +481,7 @@ const confidenceColor = (score: number) =>
             </div>
             <!-- Amount: show parsed value if we have one, otherwise prompt for it inline. -->
             <span
-              v-if="parsedResult.amount > 0"
+              v-if="!parsedNeedsAmount"
               class="text-lg font-bold shrink-0"
               :class="parsedResult.type === 'income' ? 'text-emerald-600' : 'text-slate-800'"
             >
@@ -485,7 +501,7 @@ const confidenceColor = (score: number) =>
                 step="0.01"
                 placeholder="0.00"
                 aria-label="Amount"
-                class="w-24 rounded-lg border-2 border-amber-300 bg-amber-50 px-2 py-1.5 text-right text-base font-bold text-slate-800 focus:outline-none focus:border-amber-500"
+                :class="AMOUNT_INPUT_CLASS"
               >
             </div>
           </div>
@@ -493,7 +509,7 @@ const confidenceColor = (score: number) =>
           <!-- Inline prompt when the AI didn't catch the amount. No dead-end toast; the parse card
                is still usable — user just types the missing number above and saves. -->
           <p
-            v-if="!(parsedResult.amount > 0)"
+            v-if="parsedNeedsAmount"
             class="flex items-start gap-1.5 text-xs text-amber-700 -mt-1"
           >
             <UIcon name="i-lucide-info" class="text-amber-500 text-sm shrink-0 mt-px" />
@@ -631,7 +647,7 @@ const confidenceColor = (score: number) =>
               Cancel
             </button>
             <button
-              :disabled="isSavingParsed || !(parsedResult.amount > 0) || !parsedResult.description"
+              :disabled="isSavingParsed || !canSaveParsed"
               class="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               @click="saveTransaction(parsedResult!, textFromVoice ? 'ai-voice' : 'ai-text', parsedDateEdit)"
             >
@@ -720,7 +736,7 @@ const confidenceColor = (score: number) =>
               </p>
             </div>
             <span
-              v-if="scanResult.amount > 0"
+              v-if="!scanNeedsAmount"
               class="text-lg font-bold shrink-0"
               :class="scanResult.type === 'income' ? 'text-emerald-600' : 'text-slate-800'"
             >
@@ -740,14 +756,14 @@ const confidenceColor = (score: number) =>
                 step="0.01"
                 placeholder="0.00"
                 aria-label="Amount"
-                class="w-24 rounded-lg border-2 border-amber-300 bg-amber-50 px-2 py-1.5 text-right text-base font-bold text-slate-800 focus:outline-none focus:border-amber-500"
+                :class="AMOUNT_INPUT_CLASS"
               >
             </div>
           </div>
 
           <!-- Inline prompt when vision couldn't read the receipt total. -->
           <p
-            v-if="!(scanResult.amount > 0)"
+            v-if="scanNeedsAmount"
             class="flex items-start gap-1.5 text-xs text-amber-700 -mt-1"
           >
             <UIcon name="i-lucide-info" class="text-amber-500 text-sm shrink-0 mt-px" />
@@ -846,7 +862,7 @@ const confidenceColor = (score: number) =>
               Cancel
             </button>
             <button
-              :disabled="isSavingParsed || !(scanResult.amount > 0) || !scanResult.description"
+              :disabled="isSavingParsed || !canSaveScan"
               class="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-200 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               @click="saveTransaction(scanResult!, 'ai-image', scanDateEdit)"
             >

@@ -32,48 +32,52 @@ The "AI moment" surfaces every parse visibly: a violet badge (`AI parsed · 0.4s
 
 ## System diagram
 
+```mermaid
+flowchart TB
+    classDef tier fill:#0f172a,stroke:#475569,color:#e2e8f0,stroke-width:1px
+    classDef ai fill:#7c3aed,stroke:#5b21b6,color:#ffffff,stroke-width:1px
+    classDef data fill:#0ea5e9,stroke:#0369a1,color:#ffffff,stroke-width:1px
+    classDef edge color:#475569,font-size:12px
+
+    User([User · phone or laptop]):::tier
+
+    subgraph FE["Nuxt 4 frontend · Vercel · PWA"]
+        UI["pages /add /dashboard /advisor"]
+        Pinia["Pinia stores · persisted"]
+        SBJS["Supabase JS SDK · auth + JWT refresh"]
+    end
+
+    subgraph BE["Spring Boot 3.4 backend · Cloud Run · europe-west1"]
+        Sec["SecurityConfig<br/>JWKS ES256 · per-user scoping<br/>AI rate limit · audit log"]
+        Ctrl["REST controllers<br/>/api/ai/* /api/transactions /api/profile"]
+        Svc["AiService.callWithFallback<br/>InputGuardrail / OutputGuardrail"]
+    end
+
+    subgraph AI["AI provider chain · order matters"]
+        Lite["Gemini Flash-Lite<br/>primary text · cheapest"]
+        Groq["Groq Llama 4 Scout<br/>vision + text fallback"]
+        Flash["Gemini Flash<br/>complex + advisor chat"]
+        Cere["Cerebras gpt-oss-120b<br/>last resort"]
+    end
+
+    subgraph DB["Supabase · eu-central-1"]
+        PG["Postgres 17 + pgvector<br/>transactions · profiles · chat<br/>audit_logs"]
+        SBAuth["Supabase Auth<br/>JWKS published"]
+    end
+
+    User -->|"HTTPS"| FE
+    FE -->|"Bearer JWT<br/>(ES256)"| BE
+    BE -->|"calls in order,<br/>first valid wins"| AI
+    BE -->|"JDBC · pgBouncer<br/>port 6543"| PG
+    SBJS -.->|"sign in /<br/>refresh"| SBAuth
+    Sec -.->|"fetches JWKS,<br/>verifies every token"| SBAuth
+
+    class FE,BE tier
+    class AI ai
+    class DB data
 ```
-                ┌────────────────────────────┐
-                │      NUXT 4 FRONTEND       │
-                │       (Vercel · PWA)       │
-                │                            │
-                │  Vue 3 + Tailwind 4        │
-                │  Pinia (persisted)         │
-                │  Chart.js · vue-chartjs    │
-                │  Supabase JS SDK (auth)    │
-                └─────────────┬──────────────┘
-                              │ HTTPS + Bearer JWT
-                              │ (Supabase-issued ES256)
-                ┌─────────────▼──────────────┐
-                │   SPRING BOOT 3.4 BACKEND  │
-                │  (Google Cloud Run · EU)   │
-                │                            │
-                │  Spring AI 1.0.4:          │
-                │   · structured output      │
-                │   · multimodal (vision)    │
-                │   · 4-provider fallback    │
-                │   · advisor context build  │
-                │                            │
-                │  Spring Security:          │
-                │   · JWKS (ES256) JWT       │
-                │   · per-user data scoping  │
-                │   · AI rate limiter        │
-                │                            │
-                │  Guardrails (in/out)       │
-                │  Async audit logging       │
-                │  Actuator (health/metrics) │
-                └─────────────┬──────────────┘
-                              │ JDBC (pgBouncer pooler, port 6543)
-                              │
-                ┌─────────────▼──────────────┐
-                │       SUPABASE              │
-                │                             │
-                │  PostgreSQL 17 + pgvector   │
-                │  Auth (JWKS published)      │
-                │  Row-level security         │
-                │  Free tier (50K MAU)        │
-                └─────────────────────────────┘
-```
+
+> Renders as SVG on GitHub. Raw `.md` viewers see the labelled Mermaid source.
 
 ## AI provider strategy
 

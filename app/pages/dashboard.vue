@@ -166,6 +166,10 @@ const hasWeeklyData = computed(() =>
   pulse.value.thisWeekIncome > 0 || pulse.value.lastWeekIncome > 0
   || pulse.value.thisWeekExpenses > 0 || pulse.value.lastWeekExpenses > 0
 )
+
+// First-load state: API in flight and no persisted/fetched data yet to show.
+// Hoisted so the skeleton and the balance card stay logically paired (one truth, not a negation).
+const isInitialLoad = computed(() => tx.loading && tx.transactions.length === 0)
 </script>
 
 <template>
@@ -193,7 +197,7 @@ const hasWeeklyData = computed(() =>
 
     <!-- Loading skeleton: shown during initial API fetch before any data is available -->
     <div
-      v-if="tx.loading && tx.transactions.length === 0"
+      v-if="isInitialLoad"
       class="space-y-5 animate-pulse"
     >
       <div class="rounded-2xl bg-emerald-100 h-44" />
@@ -208,7 +212,7 @@ const hasWeeklyData = computed(() =>
     <!-- Mixed-currency tripwire: should normally stay hidden. If it appears, the user's
          transactions span more than one currency and the totals below are nonsensical. -->
     <NuxtLink
-      v-if="!tx.loading && tx.hasMixedCurrency"
+      v-else-if="tx.hasMixedCurrency"
       to="/more"
       class="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 mb-4 hover:bg-amber-100 transition-colors"
     >
@@ -226,9 +230,11 @@ const hasWeeklyData = computed(() =>
       </div>
     </NuxtLink>
 
-    <!-- Balance Card (full width) -->
+    <!-- Balance Card (full width) — also gated by isInitialLoad, but the banner above
+         renders independently so a user with mixed-currency state sees both the warning
+         and the (untrustworthy) balance, not one OR the other. -->
     <div
-      v-if="!(tx.loading && tx.transactions.length === 0)"
+      v-if="!isInitialLoad"
       class="rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-800 p-5 lg:p-6 text-white shadow-lg shadow-emerald-200/60 relative overflow-hidden mb-5"
     >
       <div

@@ -36,14 +36,8 @@ export const useTransactionStore = defineStore('transactions', {
      * stay false. If it ever flips true, the balance below is summing across
      * currencies and is meaningless — show a banner so the user can recover.
      */
-    hasMixedCurrency: (state): boolean => {
-      const currencies = new Set<string>()
-      for (const t of state.transactions) {
-        if (t.currency) currencies.add(t.currency.toUpperCase())
-        if (currencies.size > 1) return true
-      }
-      return false
-    },
+    hasMixedCurrency: (state): boolean =>
+      new Set(state.transactions.map(t => t.currency?.toUpperCase()).filter(Boolean)).size > 1,
 
     recentTransactions(): Transaction[] {
       return this.sorted.slice(0, 5)
