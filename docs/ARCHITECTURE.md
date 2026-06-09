@@ -26,7 +26,7 @@ TrackAm meets every African where they are. Cash, MoMo, handwritten receipts, na
 | **MoMo screenshot** | upload MTN/Vodafone confirmation | parsed sender/receiver/amount/reference/date |
 | **Receipt photo** | snap any printed/handwritten receipt | structured line items + total |
 | **Voice** | speak the transaction | transcribed → then parsed as text |
-| **Advisor chat** | `"Where do I spend the most?"` | tool-use query on YOUR real transaction SQL → grounded answer |
+| **Advisor chat** | `"Where do I spend the most?"` | Aggregated context built from YOUR real transactions, then grounded LLM answer |
 
 The "AI moment" surfaces every parse visibly: a violet badge (`AI parsed · 0.4s`) and a `How I parsed this` panel showing which tokens in the original input drove each parsed field. This builds trust. Judges and users can see the AI isn't a black box.
 
@@ -48,11 +48,11 @@ The "AI moment" surfaces every parse visibly: a violet badge (`AI parsed · 0.4s
                 │   SPRING BOOT 3.4 BACKEND  │
                 │  (Google Cloud Run · EU)   │
                 │                            │
-                │  Spring AI 1.0.3:          │
+                │  Spring AI 1.0.4:          │
                 │   · structured output      │
                 │   · multimodal (vision)    │
-                │   · tool calling (@Tool)   │
-                │   · 3-provider fallback    │
+                │   · 4-provider fallback    │
+                │   · advisor context build  │
                 │                            │
                 │  Spring Security:          │
                 │   · JWKS (ES256) JWT       │
@@ -83,7 +83,7 @@ A four-provider chain with deterministic ordering. The first provider returning 
 |---|---|---|
 | **Groq — Llama 4 Scout** | Vision (receipts, MoMo screenshots) | Cheapest fast vision; 1,000 req/day free |
 | **Google Gemini Flash-Lite** | Primary text parsing | Lowest latency + cost for simple natural-language parses |
-| **Google Gemini Flash** | Complex parses + advisor tool-use | Stronger reasoning; handles multi-item and tool calls |
+| **Google Gemini Flash** | Complex text parses + advisor chat fallback | Stronger reasoning; second-tier model when the cheap one isn't sure |
 | **Cerebras gpt-oss-120b** | Final text fallback | Different vendor entirely — survives Google outages |
 
 Native API integrations (not OpenAI-compat shims). Embeddings use **Gemini `gemini-embedding-001` via the native API** because the OpenAI-compat dimensions parameter was unreliable.
@@ -101,7 +101,7 @@ Most AI demos call an API and display the result. TrackAm builds a full reliabil
 | **Multi-provider fallback** | `callWithFallback()` tries each provider in order, logs each attempt, throws `TrackAmException` only when all exhaust. | `service/AiService.java` |
 | **Per-user sliding-window rate limit** | 60 AI requests / minute per `userId`, 429 with `Retry-After` header. | `config/SecurityConfig.AiRateLimitFilter` |
 | **Audit trail** | Every AI call recorded async: user, operation, latency, success/fail. Survives crashes. | `service/AuditService.java` |
-| **Tool-use scoping** | Advisor `@Tool` methods receive `userId` via `ToolContext` — Gemini cannot hallucinate a different user's data. | `ai/tools/AdvisorTools.java` |
+| **Server-controlled context scoping** | Advisor loads transactions from Postgres scoped by JWT subject before they ever reach the LLM. The model has no input field through which it could request a different user's data. | `service/AiService.askAdvisor` |
 
 ## Authentication
 
