@@ -30,7 +30,7 @@ TrackAm fixes the substrate. It meets every African where they are. You can type
 ## If you only read one thing
 
 - **Functional, deployed coded MVP.** Nuxt 4 frontend on Vercel, Spring Boot 3.4 backend on Google Cloud Run, Supabase Postgres with pgvector. Both tiers are live and real data flows end-to-end.
-- **4-provider AI fallback chain** for text parsing (Gemini Flash-Lite → Groq → Gemini Flash → Cerebras). Groq Llama 4 Scout handles vision for receipts and MoMo screenshots. A tool-use advisor runs real SQL against your transactions via `@Tool`-annotated methods scoped per user.
+- **4-provider AI fallback chain** for text parsing (Gemini Flash-Lite → Groq → Gemini Flash → Cerebras). Groq Llama 4 Scout handles vision for receipts and MoMo screenshots. The advisor stuffs an aggregated, server-scoped summary of your real transactions into the LLM prompt, so answers are grounded in your data without giving the model any way to request someone else's.
 - **The "AI moment" is visible.** Every parse shows a badge with the parse latency and a collapsible reasoning trace highlighting the input tokens that drove each field. No black box.
 - **41 backend tests** covering JWT validation, the AI fallback chain, prompt-injection guardrails, and the FX currency-match validator that prevents balance corruption.
 - **Real-world adaptability.** Multi-currency support with conversion at the historical rate per transaction. MoMo and cash-first design. Voice input for users who'd rather speak than type.
