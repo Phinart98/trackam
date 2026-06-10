@@ -136,8 +136,9 @@ export const useGoalStore = defineStore('goals', {
             headers: token ? { Authorization: `Bearer ${token}` } : {}
           })
         } catch (err: unknown) {
-          // 404 means already deleted remotely — proceed with local removal.
-          if ((err as { statusCode?: number })?.statusCode !== 404) return
+          // 404 means already deleted remotely, so local removal can proceed.
+          // Anything else must surface to the caller, not vanish under a success toast.
+          if ((err as { statusCode?: number })?.statusCode !== 404) throw err
         }
       }
 

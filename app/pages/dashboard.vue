@@ -73,7 +73,9 @@ function animateCounter(from: number, target: number, setter: (v: number) => voi
     const elapsed = now - start
     const progress = Math.min(elapsed / duration, 1)
     const eased = 1 - (1 - progress) ** 3 // ease-out cubic
-    setter(Math.round(from + (target - from) * eased))
+    // Whole numbers mid-flight, but the final frame must land on the exact
+    // target or the card permanently drops the cents (86 vs 85.50).
+    setter(progress === 1 ? target : Math.round(from + (target - from) * eased))
     if (progress < 1) requestAnimationFrame(tick)
   }
   requestAnimationFrame(tick)

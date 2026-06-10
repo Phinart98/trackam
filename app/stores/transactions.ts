@@ -86,17 +86,17 @@ export const useTransactionStore = defineStore('transactions', {
       } else if (range === '1M' || range === '3M') {
         const weeks = range === '1M' ? 4 : 12
         for (let i = weeks - 1; i >= 0; i--) {
-          const weekEnd = new Date(now)
-          weekEnd.setDate(weekEnd.getDate() - i * 7)
-          // Include end date (add 1 day so today's transactions are not excluded)
-          const weekEndInclusive = new Date(weekEnd)
-          weekEndInclusive.setDate(weekEndInclusive.getDate() + 1)
-          const weekStart = new Date(weekEnd)
+          // Buckets are 7 whole days ending on day-boundary edges, so adjacent
+          // windows are contiguous and no transaction is counted twice.
+          const endExclusive = new Date(now)
+          endExclusive.setDate(endExclusive.getDate() - i * 7 + 1)
+          endExclusive.setHours(0, 0, 0, 0)
+          const weekStart = new Date(endExclusive)
           weekStart.setDate(weekStart.getDate() - 7)
           labels.push(weekStart.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }))
           const txs = this.transactions.filter((t) => {
             const d = new Date(t.date)
-            return d >= weekStart && d < weekEndInclusive
+            return d >= weekStart && d < endExclusive
           })
           income.push(sumByType(txs, 'income'))
           expenses.push(sumByType(txs, 'expense'))

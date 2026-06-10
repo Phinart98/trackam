@@ -175,8 +175,12 @@ const { confirm } = useConfirm()
 
 async function handleDelete(id: string) {
   if (!await confirm('Delete this savings goal?')) return
-  await goalStore.removeGoal(id)
-  toast.add({ title: 'Goal removed', color: 'neutral' })
+  try {
+    await goalStore.removeGoal(id)
+    toast.add({ title: 'Goal removed', color: 'neutral' })
+  } catch {
+    toast.add({ title: 'Couldn\'t remove goal', description: 'Please try again.', color: 'error' })
+  }
 }
 
 const iconSubset = [

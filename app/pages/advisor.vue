@@ -30,7 +30,12 @@ async function streamText(msgId: string, fullText: string) {
   streamingId.value = msgId
   const charDelay = Math.max(4, Math.min(12, 600 / fullText.length))
   for (let i = 1; i <= fullText.length; i++) {
-    if (cancelled) return
+    if (cancelled) {
+      // Messages are persisted, so commit the full reply before bailing or the
+      // user comes back to a permanently cut-off answer.
+      chat.updateMessageContent(msgId, fullText)
+      return
+    }
     chat.updateMessageContent(msgId, fullText.slice(0, i))
     if (i % 3 === 0) scrollToBottom()
     await new Promise(r => setTimeout(r, charDelay))

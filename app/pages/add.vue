@@ -92,6 +92,9 @@ const textParseError = ref('')
 const textAmountInput = ref<HTMLInputElement | null>(null)
 let textConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
+// Latched once per parse: gating the input on the live computed would unmount it
+// after the first keystroke (1 > 0 flips parsedNeedsAmount mid-typing).
+const parsedAmountWasMissing = ref(false)
 const parsedNeedsAmount = computed(() => !hasAmount(parsedResult.value))
 const canSaveParsed = computed(() =>
   !!parsedResult.value && hasAmount(parsedResult.value) && !!parsedResult.value.description
@@ -137,6 +140,7 @@ async function handleParseText() {
   try {
     const result = await parseText(inputAtStart)
     parsedResult.value = result
+    parsedAmountWasMissing.value = !hasAmount(result)
     lastTextInput.value = inputAtStart
     parsedDateEdit.value = result.date.slice(0, 10)
     textParseElapsedMs.value = Math.round(performance.now() - started)
@@ -169,6 +173,7 @@ const scanParseElapsedMs = ref<number | null>(null)
 const scanError = ref('')
 let scanConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
+const scanAmountWasMissing = ref(false)
 const scanNeedsAmount = computed(() => !hasAmount(scanResult.value))
 const canSaveScan = computed(() =>
   !!scanResult.value && hasAmount(scanResult.value) && !!scanResult.value.description
@@ -200,6 +205,7 @@ async function handleScan(file: File) {
   try {
     const result = await parseImage(file)
     scanResult.value = result
+    scanAmountWasMissing.value = !hasAmount(result)
     scanDateEdit.value = result.date.slice(0, 10)
     scanParseElapsedMs.value = Math.round(performance.now() - started)
     if (scanConfidenceTimer) clearInterval(scanConfidenceTimer)
@@ -525,7 +531,7 @@ const confidenceColor = (score: number) =>
             </div>
             <!-- Amount: show parsed value if we have one, otherwise prompt for it inline. -->
             <span
-              v-if="!parsedNeedsAmount"
+              v-if="!parsedAmountWasMissing"
               class="text-lg font-bold shrink-0"
               :class="parsedResult.type === 'income' ? 'text-emerald-600' : 'text-slate-800'"
             >
@@ -553,7 +559,7 @@ const confidenceColor = (score: number) =>
           <!-- Inline prompt when the AI didn't catch the amount. No dead-end toast; the parse card
                is still usable — user just types the missing number above and saves. -->
           <p
-            v-if="parsedNeedsAmount"
+            v-if="parsedAmountWasMissing && parsedNeedsAmount"
             class="flex items-start gap-1.5 text-xs text-amber-700 -mt-1"
           >
             <UIcon
@@ -819,7 +825,7 @@ const confidenceColor = (score: number) =>
               </p>
             </div>
             <span
-              v-if="!scanNeedsAmount"
+              v-if="!scanAmountWasMissing"
               class="text-lg font-bold shrink-0"
               :class="scanResult.type === 'income' ? 'text-emerald-600' : 'text-slate-800'"
             >
@@ -846,7 +852,7 @@ const confidenceColor = (score: number) =>
 
           <!-- Inline prompt when vision couldn't read the receipt total. -->
           <p
-            v-if="scanNeedsAmount"
+            v-if="scanAmountWasMissing && scanNeedsAmount"
             class="flex items-start gap-1.5 text-xs text-amber-700 -mt-1"
           >
             <UIcon
