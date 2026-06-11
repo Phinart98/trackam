@@ -65,16 +65,23 @@ async function toggleVoice() {
 // reuse this so the warning input stays visually identical across them.
 const AMOUNT_INPUT_CLASS = 'w-24 rounded-lg border-2 border-amber-300 bg-amber-50 px-2 py-1.5 text-right text-base font-bold text-slate-800 focus:outline-none focus:border-amber-500'
 
-function focusOnMissingAmount(
+// Latches "amount was missing at parse time" and focuses the inline input.
+// The latch must be set once per parse, not derived live: gating the input on
+// the current amount would unmount it after the first keystroke (1 > 0 flips
+// the condition mid-typing). Watching the result ref covers every parse path.
+function useMissingAmount(
   source: Ref<ParsedTransaction | null>,
   target: Ref<HTMLInputElement | null>
 ) {
+  const wasMissing = ref(false)
   watch(source, async (r) => {
-    if (r && !(r.amount > 0)) {
+    wasMissing.value = !!r && !(r.amount > 0)
+    if (wasMissing.value) {
       await nextTick()
       target.value?.focus()
     }
   })
+  return wasMissing
 }
 
 const hasAmount = (r: ParsedTransaction | null) => !!r && r.amount > 0
@@ -92,15 +99,12 @@ const textParseError = ref('')
 const textAmountInput = ref<HTMLInputElement | null>(null)
 let textConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
-// Latched once per parse: gating the input on the live computed would unmount it
-// after the first keystroke (1 > 0 flips parsedNeedsAmount mid-typing).
-const parsedAmountWasMissing = ref(false)
 const parsedNeedsAmount = computed(() => !hasAmount(parsedResult.value))
 const canSaveParsed = computed(() =>
   !!parsedResult.value && hasAmount(parsedResult.value) && !!parsedResult.value.description
 )
 
-focusOnMissingAmount(parsedResult, textAmountInput)
+const parsedAmountWasMissing = useMissingAmount(parsedResult, textAmountInput)
 
 const textBreakdown = computed<BreakdownToken[]>(() => {
   if (!parsedResult.value || !lastTextInput.value) return []
@@ -140,7 +144,6 @@ async function handleParseText() {
   try {
     const result = await parseText(inputAtStart)
     parsedResult.value = result
-    parsedAmountWasMissing.value = !hasAmount(result)
     lastTextInput.value = inputAtStart
     parsedDateEdit.value = result.date.slice(0, 10)
     textParseElapsedMs.value = Math.round(performance.now() - started)
@@ -173,13 +176,12 @@ const scanParseElapsedMs = ref<number | null>(null)
 const scanError = ref('')
 let scanConfidenceTimer: ReturnType<typeof setInterval> | null = null
 
-const scanAmountWasMissing = ref(false)
 const scanNeedsAmount = computed(() => !hasAmount(scanResult.value))
 const canSaveScan = computed(() =>
   !!scanResult.value && hasAmount(scanResult.value) && !!scanResult.value.description
 )
 
-focusOnMissingAmount(scanResult, scanAmountInput)
+const scanAmountWasMissing = useMissingAmount(scanResult, scanAmountInput)
 
 function handleFileSelect(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
@@ -205,7 +207,6 @@ async function handleScan(file: File) {
   try {
     const result = await parseImage(file)
     scanResult.value = result
-    scanAmountWasMissing.value = !hasAmount(result)
     scanDateEdit.value = result.date.slice(0, 10)
     scanParseElapsedMs.value = Math.round(performance.now() - started)
     if (scanConfidenceTimer) clearInterval(scanConfidenceTimer)
@@ -559,7 +560,7 @@ const confidenceColor = (score: number) =>
           <!-- Inline prompt when the AI didn't catch the amount. No dead-end toast; the parse card
                is still usable — user just types the missing number above and saves. -->
           <p
-            v-if="parsedAmountWasMissing && parsedNeedsAmount"
+            v-if="parsedNeedsAmount"
             class="flex items-start gap-1.5 text-xs text-amber-700 -mt-1"
           >
             <UIcon
@@ -852,7 +853,7 @@ const confidenceColor = (score: number) =>
 
           <!-- Inline prompt when vision couldn't read the receipt total. -->
           <p
-            v-if="scanAmountWasMissing && scanNeedsAmount"
+            v-if="scanNeedsAmount"
             class="flex items-start gap-1.5 text-xs text-amber-700 -mt-1"
           >
             <UIcon

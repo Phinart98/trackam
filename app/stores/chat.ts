@@ -15,10 +15,6 @@ export const useChatStore = defineStore('chat', {
         timestamp: new Date().toISOString()
       })
     },
-    updateMessageContent(id: string, content: string) {
-      const msg = this.messages.find(m => m.id === id)
-      if (msg) msg.content = content
-    },
     setSessionId(id: string) {
       this.sessionId = id
     },

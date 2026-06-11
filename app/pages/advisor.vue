@@ -8,6 +8,7 @@ const userInput = ref('')
 const isThinking = ref(false)
 const isStreaming = ref(false)
 const streamingId = ref<string | null>(null)
+const streamedChars = ref(0)
 const messagesEl = ref<HTMLElement | null>(null)
 let cancelled = false
 onMounted(() => {
@@ -25,18 +26,17 @@ const suggestions = [
   'What\'s my profit margin?'
 ]
 
-async function streamText(msgId: string, fullText: string) {
+// Display-only typewriter. The full reply is already persisted in the store;
+// this just advances how much of it the template reveals. A refresh or
+// navigation mid-stream can therefore never leave a truncated message behind.
+async function streamText(msgId: string, totalChars: number) {
   isStreaming.value = true
   streamingId.value = msgId
-  const charDelay = Math.max(4, Math.min(12, 600 / fullText.length))
-  for (let i = 1; i <= fullText.length; i++) {
-    if (cancelled) {
-      // Messages are persisted, so commit the full reply before bailing or the
-      // user comes back to a permanently cut-off answer.
-      chat.updateMessageContent(msgId, fullText)
-      return
-    }
-    chat.updateMessageContent(msgId, fullText.slice(0, i))
+  streamedChars.value = 0
+  const charDelay = Math.max(4, Math.min(12, 600 / totalChars))
+  for (let i = 1; i <= totalChars; i++) {
+    if (cancelled) return
+    streamedChars.value = i
     if (i % 3 === 0) scrollToBottom()
     await new Promise(r => setTimeout(r, charDelay))
   }
@@ -68,10 +68,10 @@ async function send(text?: string) {
   try {
     const reply = await askAdvisor(message, context)
     isThinking.value = false
-    chat.addMessage('assistant', '')
+    chat.addMessage('assistant', reply)
     const lastMsg = chat.messages[chat.messages.length - 1]!
     await nextTick()
-    await streamText(lastMsg.id, reply)
+    await streamText(lastMsg.id, reply.length)
   } catch {
     isThinking.value = false
     chat.addMessage('assistant', 'Sorry, I had trouble processing that. Please try again.')
@@ -173,7 +173,7 @@ function renderMarkdown(text: string) {
           v-else
           class="max-w-[80%] px-4 py-3 rounded-2xl rounded-bl-sm text-[15px] leading-relaxed bg-slate-100 text-slate-800"
         >
-          <span v-html="renderMarkdown(msg.content)" />
+          <span v-html="renderMarkdown(streamingId === msg.id ? msg.content.slice(0, streamedChars) : msg.content)" />
           <span
             v-if="streamingId === msg.id"
             class="inline-block w-0.5 h-4 bg-slate-400 ml-0.5 align-middle animate-pulse"
