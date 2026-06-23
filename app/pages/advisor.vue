@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { roundMoney } from '~/utils/formatters'
+
 const auth = useAuthStore()
 const tx = useTransactionStore()
 const chat = useChatStore()
@@ -55,11 +57,10 @@ async function send(text?: string) {
   scrollToBottom()
 
   // Round to 2dp so the LLM never echoes spurious float precision like "3954.5454".
-  const round2 = (n: number) => Math.round(n * 100) / 100
   const context = {
-    totalIncome: round2(tx.totalIncome),
-    totalExpenses: round2(tx.totalExpenses),
-    balance: round2(tx.balance),
+    totalIncome: roundMoney(tx.totalIncome),
+    totalExpenses: roundMoney(tx.totalExpenses),
+    balance: roundMoney(tx.balance),
     topCategory: tx.categoryBreakdown[0]?.name ?? 'General',
     transactionCount: tx.transactions.length,
     currency: auth.currency

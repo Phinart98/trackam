@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getCurrencyFlag, getCurrencySymbol, SUPPORTED_CURRENCIES } from '~/utils/formatters'
+import { getCurrencyFlag, getCurrencySymbol, roundMoney, SUPPORTED_CURRENCIES } from '~/utils/formatters'
 import { BUSINESS_TYPES } from '~/utils/categories'
 
 const auth = useAuthStore()
@@ -116,7 +116,11 @@ async function changeCurrency(newCode: string) {
         budgetRatePromise
       ])
       if (budgetFx && auth.profile?.monthlyBudget) {
-        auth.profile.monthlyBudget = Math.round(auth.profile.monthlyBudget * Number(budgetFx.rate))
+        const rate = Number(budgetFx.rate)
+        // Guard a malformed/zero rate so we never zero out the user's budget.
+        if (Number.isFinite(rate) && rate > 0) {
+          auth.profile.monthlyBudget = roundMoney(auth.profile.monthlyBudget * rate)
+        }
       }
       selectedCurrency.value = newCode
       const saved = await auth.saveProfile()

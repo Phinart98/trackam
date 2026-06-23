@@ -204,10 +204,6 @@ export const useTransactionStore = defineStore('transactions', {
 
     setChartRange(range: ChartRange) {
       this.chartRange = range
-    },
-
-    addTransaction(tx: Omit<Transaction, 'id'>) {
-      this.transactions.unshift({ ...tx, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` })
     }
   },
 

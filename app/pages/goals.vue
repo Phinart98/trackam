@@ -199,7 +199,7 @@ const iconSubset = [
         <h1 class="text-xl font-bold text-slate-900 font-display lg:text-2xl">
           Savings Goals
         </h1>
-        <p class="text-sm text-slate-400 mt-0.5">
+        <p class="text-sm text-slate-500 mt-0.5">
           Save toward what matters — school fees, stock, a new stall
         </p>
       </div>
@@ -235,21 +235,28 @@ const iconSubset = [
           </h2>
           <button
             class="text-slate-400 hover:text-slate-600"
+            aria-label="Close form"
             @click="resetForm"
           >
             <UIcon
               name="i-lucide-x"
               class="text-lg"
+              aria-hidden="true"
             />
           </button>
         </div>
 
         <!-- Name -->
         <div>
-          <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">What are you saving for?</label>
+          <label
+            for="goal-name"
+            class="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5"
+          >What are you saving for?</label>
           <input
+            id="goal-name"
             v-model="formName"
             type="text"
+            maxlength="60"
             placeholder="e.g. New Market Stall, School Fees, Generator"
             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
           >
@@ -257,14 +264,20 @@ const iconSubset = [
 
         <!-- Target Amount -->
         <div>
-          <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Target Amount</label>
+          <label
+            for="goal-target"
+            class="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5"
+          >Target Amount</label>
           <div class="relative">
             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">{{ getCurrencySymbol(auth.currency) }}</span>
             <input
+              id="goal-target"
               v-model="formTarget"
               type="number"
+              inputmode="decimal"
               min="1"
               step="0.01"
+              max="9999999.99"
               placeholder="0.00"
               class="w-full rounded-lg border border-slate-200 bg-white pl-14 pr-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
             >
@@ -287,10 +300,16 @@ const iconSubset = [
         <!-- Icon picker (subset) -->
         <div>
           <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Icon</label>
-          <div class="flex flex-wrap gap-1.5">
+          <div
+            role="group"
+            aria-label="Goal icon"
+            class="flex flex-wrap gap-1.5"
+          >
             <button
               v-for="icon in iconSubset"
               :key="icon"
+              :aria-label="icon.replace('i-lucide-', '')"
+              :aria-pressed="formIcon === icon"
               class="w-9 h-9 rounded-lg flex items-center justify-center transition-all active:scale-90"
               :class="formIcon === icon
                 ? `${formColor.bgColor} ring-2 ring-offset-1 ring-emerald-400`
@@ -300,6 +319,7 @@ const iconSubset = [
               <UIcon
                 :name="icon"
                 class="text-base"
+                aria-hidden="true"
                 :class="formIcon === icon ? formColor.color : 'text-slate-500'"
               />
             </button>
@@ -309,10 +329,16 @@ const iconSubset = [
         <!-- Color picker -->
         <div>
           <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Color</label>
-          <div class="flex flex-wrap gap-2">
+          <div
+            role="group"
+            aria-label="Goal colour"
+            class="flex flex-wrap gap-2"
+          >
             <button
               v-for="(preset, idx) in COLOR_PRESETS"
               :key="preset.name"
+              :aria-label="preset.name"
+              :aria-pressed="formColorIdx === idx"
               class="w-8 h-8 rounded-full transition-all active:scale-90"
               :class="formColorIdx === idx ? 'ring-2 ring-offset-2 ring-emerald-400 scale-110' : 'hover:scale-105'"
               :style="{ backgroundColor: preset.dotColor }"

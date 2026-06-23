@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatCurrency, ringOffset } from '~/utils/formatters'
+import { formatCurrency, ringOffset, roundMoney } from '~/utils/formatters'
 import { computeHealthScore, weekOverWeek, detectAnomalies } from '~/utils/forecasting'
 import { COLOR_PRESETS } from '~/stores/categories'
 
@@ -30,12 +30,11 @@ async function refreshInsightIfStale(force = false) {
     const top = tx.categoryBreakdown[0]
     const anomaly = detectAnomalies(tx.transactions, auth.currency)[0]?.message ?? null
     // Round to 2dp so the LLM never echoes spurious precision from raw float math.
-    const round2 = (n: number) => Math.round(n * 100) / 100
     const text = await generateInsight({
       currency: auth.currency,
-      totalIncome: round2(tx.totalIncome),
-      totalExpenses: round2(tx.totalExpenses),
-      balance: round2(tx.balance),
+      totalIncome: roundMoney(tx.totalIncome),
+      totalExpenses: roundMoney(tx.totalExpenses),
+      balance: roundMoney(tx.balance),
       burnPercent: tx.forecast.burnPercent,
       daysRemaining: tx.forecast.daysRemaining,
       topCategoryName: top?.name ?? 'General',
@@ -189,7 +188,7 @@ const isInitialLoad = computed(() => tx.loading && tx.transactions.length === 0)
         <h1 class="text-2xl font-bold text-slate-900 font-display">
           Dashboard
         </h1>
-        <p class="text-sm text-slate-400 mt-0.5">
+        <p class="text-sm text-slate-500 mt-0.5">
           {{ new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }}
         </p>
       </div>
@@ -364,11 +363,13 @@ const isInitialLoad = computed(() => tx.loading && tx.transactions.length === 0)
             v-if="!insightLoading && tx.transactions.length > 0"
             class="text-violet-300 hover:text-violet-500 transition-colors"
             title="Refresh insight"
+            aria-label="Refresh insight"
             @click="forceRefreshInsight"
           >
             <UIcon
               name="i-lucide-refresh-cw"
               class="text-xs"
+              aria-hidden="true"
             />
           </button>
         </div>

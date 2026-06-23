@@ -1,5 +1,12 @@
 <script setup lang="ts">
 const { state, accept, cancel } = useConfirm()
+
+// Move focus into the dialog when it opens so keyboard and screen-reader users
+// land on a safe (non-destructive) control instead of being stranded on the page.
+const cancelBtn = ref<HTMLButtonElement | null>(null)
+watch(() => state.show, (show) => {
+  if (show) nextTick(() => cancelBtn.value?.focus())
+})
 </script>
 
 <template>
@@ -16,8 +23,14 @@ const { state, accept, cancel } = useConfirm()
         v-if="state.show"
         class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30"
         @click.self="cancel"
+        @keydown.esc="cancel"
       >
-        <div class="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-sm p-5 space-y-4 safe-area-bottom">
+        <div
+          role="dialog"
+          aria-modal="true"
+          :aria-label="state.title"
+          class="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-sm p-5 space-y-4 safe-area-bottom"
+        >
           <h3 class="text-sm font-bold text-slate-800">
             {{ state.title }}
           </h3>
@@ -29,6 +42,7 @@ const { state, accept, cancel } = useConfirm()
           </p>
           <div class="flex gap-2">
             <button
+              ref="cancelBtn"
               class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors"
               @click="cancel"
             >

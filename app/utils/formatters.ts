@@ -40,10 +40,23 @@ export const getCurrencySymbol = (code: string): string =>
 export const getCurrencyFlag = (code: string): string =>
   SUPPORTED_CURRENCIES.find(c => c.code === code)?.flag ?? ''
 
+/**
+ * Round a monetary amount to 2 decimal places.
+ *
+ * On the client, amounts are plain JS `number`s *by design*: this is a
+ * display/estimation layer, and every value is rounded before a human sees it.
+ * The authoritative system of record is the backend, which stores money as
+ * `BigDecimal` / `DECIMAL(19,4)`. Use this helper whenever a client-side
+ * computation (e.g. an FX conversion) produces a value that will be persisted,
+ * so the rounding is consistent and defensive across the app.
+ */
+export const roundMoney = (amount: number): number =>
+  Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0
+
 export const formatCurrency = (amount: number, currency: string = 'GHS'): string => {
   if (!Number.isFinite(amount)) return `${getCurrencySymbol(currency)} --`
   const symbol = getCurrencySymbol(currency)
-  const formatted = (amount + 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const formatted = amount.toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   return `${symbol} ${formatted}`
 }
 

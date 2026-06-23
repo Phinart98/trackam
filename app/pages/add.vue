@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { ParsedTransaction } from '~/types'
-import { formatCurrency, getCurrencySymbol, SUPPORTED_CURRENCIES } from '~/utils/formatters'
+import { formatCurrency, getCurrencySymbol, roundMoney, SUPPORTED_CURRENCIES } from '~/utils/formatters'
 import { buildParseBreakdown, type BreakdownToken } from '~/utils/parseBreakdown'
 
 const auth = useAuthStore()
@@ -287,14 +287,20 @@ async function saveManual() {
   if (isSavingManual.value) return
   const rawAmount = parseFloat(manualAmount.value)
   if (!manualCategory.value || !manualDescription.value || !isFinite(rawAmount) || rawAmount <= 0) return
+  // Catch a fat-finger client-side with a friendly message rather than a backend 400
+  // (mirrors the API's @DecimalMax bound).
+  if (rawAmount > 9999999.99) {
+    toast.add({ title: 'Amount too large', description: 'Please enter an amount under 10,000,000.', color: 'warning' })
+    return
+  }
   isSavingManual.value = true
   try {
     let amount = rawAmount
     let originalCurrency: string | undefined
     if (manualCurrency.value !== auth.currency) {
       const rate = await fetchFxRate(manualCurrency.value, auth.currency, manualDate.value)
-      if (rate) {
-        amount = Math.round(rawAmount * rate * 100) / 100
+      if (rate && rate > 0) {
+        amount = roundMoney(rawAmount * rate)
         originalCurrency = manualCurrency.value
       } else {
         toast.add({
@@ -328,6 +334,13 @@ async function saveManual() {
 }
 
 const today = computed(() => new Date().toISOString().slice(0, 10))
+// Floor for date pickers: financial records older than a few years aren't useful here,
+// and this blocks accidental year-1900 entries from a mistyped date field.
+const minDate = computed(() => {
+  const d = new Date()
+  d.setFullYear(d.getFullYear() - 5)
+  return d.toISOString().slice(0, 10)
+})
 
 const confidenceColor = (score: number) =>
   score >= 90 ? 'text-green-600' : score >= 80 ? 'text-yellow-600' : 'text-red-500'
@@ -377,7 +390,10 @@ const confidenceColor = (score: number) =>
       >
         <div>
           <div class="flex items-center justify-between mb-2">
-            <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+            <label
+              for="text-input"
+              class="text-xs font-semibold text-slate-600 uppercase tracking-wide"
+            >
               Describe your transaction
             </label>
             <!-- Mic button: tap to start recording, tap again to stop & transcribe -->
@@ -433,8 +449,10 @@ const confidenceColor = (score: number) =>
             </button>
           </div>
           <textarea
+            id="text-input"
             v-model="textInput"
             rows="4"
+            maxlength="500"
             :placeholder="isRecording
               ? 'Listening… speak your transaction'
               : isTranscribing
@@ -637,6 +655,7 @@ const confidenceColor = (score: number) =>
             <input
               v-model="parsedDateEdit"
               type="date"
+              :min="minDate"
               :max="today"
               class="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-emerald-400"
             >
@@ -930,6 +949,7 @@ const confidenceColor = (score: number) =>
             <input
               v-model="scanDateEdit"
               type="date"
+              :min="minDate"
               :max="today"
               class="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-emerald-400"
             >
@@ -980,7 +1000,11 @@ const confidenceColor = (score: number) =>
         <!-- Type toggle -->
         <div>
           <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2">Type</label>
-          <div class="flex gap-2 p-1 bg-slate-100 rounded-xl">
+          <div
+            role="group"
+            aria-label="Transaction type"
+            class="flex gap-2 p-1 bg-slate-100 rounded-xl"
+          >
             <button
               class="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all"
               :class="manualType === 'expense' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'"
@@ -1000,7 +1024,10 @@ const confidenceColor = (score: number) =>
 
         <!-- Amount -->
         <div>
-          <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2">Amount</label>
+          <label
+            for="manual-amount"
+            class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2"
+          >Amount</label>
           <div class="flex gap-2">
             <!-- Currency picker button -->
             <div class="relative">
@@ -1034,10 +1061,13 @@ const confidenceColor = (score: number) =>
               </div>
             </div>
             <input
+              id="manual-amount"
               v-model="manualAmount"
               type="number"
+              inputmode="decimal"
               step="0.01"
               min="0"
+              max="9999999.99"
               placeholder="0.00"
               class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
             >
@@ -1058,7 +1088,11 @@ const confidenceColor = (score: number) =>
         <!-- Category -->
         <div>
           <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2">Category</label>
-          <div class="grid grid-cols-3 gap-2">
+          <div
+            role="group"
+            aria-label="Category"
+            class="grid grid-cols-3 gap-2"
+          >
             <button
               v-for="cat in manualCategories"
               :key="cat.id"
@@ -1085,10 +1119,15 @@ const confidenceColor = (score: number) =>
 
         <!-- Description -->
         <div>
-          <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2">Description</label>
+          <label
+            for="manual-description"
+            class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2"
+          >Description</label>
           <input
+            id="manual-description"
             v-model="manualDescription"
             type="text"
+            maxlength="200"
             placeholder="e.g. Rice from Makola Market"
             class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
           >
@@ -1096,10 +1135,15 @@ const confidenceColor = (score: number) =>
 
         <!-- Date -->
         <div>
-          <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2">Date</label>
+          <label
+            for="manual-date"
+            class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2"
+          >Date</label>
           <input
+            id="manual-date"
             v-model="manualDate"
             type="date"
+            :min="minDate"
             :max="today"
             class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-800 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
           >
