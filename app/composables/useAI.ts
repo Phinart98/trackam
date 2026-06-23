@@ -1,5 +1,6 @@
 import type { ParsedTransaction } from '~/types'
 import { CATEGORY_KEYWORDS, INCOME_KEYWORDS, EXPENSE_KEYWORDS } from '~/utils/parseBreakdown'
+import { formatCurrency } from '~/utils/formatters'
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -148,10 +149,20 @@ export const useAI = () => {
 
     const { totalIncome, totalExpenses, balance, topCategory, transactionCount, currency } = context
     const q = question.toLowerCase()
-    const fmt = (n: number) => `${currency === 'GHS' ? 'GH₵' : currency} ${n.toFixed(2)}`
+    const fmt = (n: number) => formatCurrency(n, currency)
+
+    // No data yet — don't fabricate comparisons. Mirrors generateInsight's empty-state guard.
+    if (transactionCount === 0) {
+      return 'You haven\'t recorded any transactions yet, so there\'s nothing to analyse. Add a few income and expense entries and I can give you tailored advice on savings, spending, and profit.'
+    }
 
     if (q.includes('how am i doing') || q.includes('overview') || q.includes('summary')) {
-      return `This month you've earned **${fmt(totalIncome)}** and spent **${fmt(totalExpenses)}**, giving you a net balance of **${fmt(balance)}**. You have ${transactionCount} transactions recorded. ${balance > 0 ? '🎉 You\'re in profit — keep it up!' : '📊 Your expenses are slightly higher than income. Let\'s look at where you can trim.'}`
+      const verdict = balance > 0
+        ? '🎉 You\'re in profit — keep it up!'
+        : balance < 0
+          ? '📊 Your expenses are higher than your income. Let\'s look at where you can trim.'
+          : '⚖️ Your income and expenses are exactly balanced this month.'
+      return `This month you've earned **${fmt(totalIncome)}** and spent **${fmt(totalExpenses)}**, giving you a net balance of **${fmt(balance)}**. You have ${transactionCount} transactions recorded. ${verdict}`
     }
 
     if (q.includes('spend') || q.includes('where') || q.includes('most')) {
@@ -159,6 +170,9 @@ export const useAI = () => {
     }
 
     if (q.includes('save') || q.includes('saving')) {
+      if (totalIncome === 0) {
+        return `You haven't logged any income yet this month, so there's nothing to set aside just yet. Once money starts coming in, a good target is to save 20% of it. For now, your biggest cost is **${topCategory}** — trimming 10% there would free up **${fmt(totalExpenses * 0.1)}**.`
+      }
       const savingsTarget = totalIncome * 0.2
       return `A good rule is to save **20% of income** — for you, that's about **${fmt(savingsTarget)}** this month. Based on your transactions, your biggest saving opportunity is reducing ${topCategory} expenses. Even cutting 10% there would save you **${fmt(totalExpenses * 0.1)}** monthly. Consider a separate 'savings wallet' and move money there on the day you receive income.`
     }
@@ -195,7 +209,7 @@ export const useAI = () => {
     // Mock: derive a rule-based insight so it still feels live
     await delay(800)
     const { totalIncome, totalExpenses, balance, burnPercent, daysRemaining, topCategoryName, currency } = payload
-    const fmt = (n: number) => `${currency === 'GHS' ? 'GH₵' : currency} ${n.toFixed(2)}`
+    const fmt = (n: number) => formatCurrency(n, currency)
     if (payload.transactionCount === 0) return 'Add your first transaction to get a personalised insight.'
     if (burnPercent > 100) return `You've gone over budget and have ${daysRemaining} days left in the month. Your ${topCategoryName} spending is the main driver — consider pausing non-essential purchases until the month resets.`
     if (burnPercent > 80) return `You're at ${burnPercent}% of your monthly budget with ${daysRemaining} days to go. At this rate your top category (${topCategoryName}) could push you over — watch it closely.`
